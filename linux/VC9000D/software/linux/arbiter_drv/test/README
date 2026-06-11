@@ -1,0 +1,32 @@
+
+### Description
+
+    The testbench is used for testing arbiter driver. It can config arbiter
+params(enable, time window) and masters params(enable, urgent, bw_overflow
+and weight). In addition, irq status can aslo be checked.
+
+### USAGE
+
+> make clean all
+> ./arbiter_test [option]
+
+    Before using the testbench, you should load arbiter driver firstly. The option
+is defined in arbiter_get_option.h. If you want config any arbiter, you must specify
+the arbiter id in option; if you want config any master of arbiter, you must sepcify
+the arbiter id and master id in option.
+
+#### Example
+
+1. if config arbiter[0]
+> ./arbiter_test --arbId=0 --arbEnable=1 --timeWindow=29
+
+2. if config master[0] of arbiter[0]
+> ./arbiter_test --arbId=0 --masterId=0 --onLine=1 --urgent=1 --weight=31 --bwOverflow=0
+
+3. check irq status:
+  1) if waitTimeout=0, will keep waiting any arbiter err irq with wait_event_interruptible;
+  2) if waitTimeout!=0, will wait any arbiter err irq with wait_event_interruptible_timeout,
+       if not waited, then will timeout after waitTimeout ms.
+
+> ./arbiter_test --checkIrq=1 --waitTimeout=0
+

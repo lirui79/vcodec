@@ -1,0 +1,71 @@
+-- CONFIGURE --
+
+You need edit subsys_cfg.h, modify the PCI configuration parameters and parameters
+that list all the sub-systems and hardware cores in each sub-system.
+
+1. Set vendor and device for PIC device and related control and memory BAR registers:
+
+    PCI_VENDOR_ID_HANTRO
+    PCI_DEVICE_ID_HANTRO
+    PCI_CONTROL_BAR
+    PCI_DDR_BAR
+
+2. subsys_array
+3. core_array
+
+Below is a simple example of a single sub-system of VCD with VCMD.
+
+struct SubsysDesc subsys_array[] ={
+    {0,0,0x600000},
+};
+struct CoreDesc core_array[] ={
+    {0,0,HW_VCD,0x800,MAX_REG_COUNT*4,-1,1},
+    {0,0,HW_VCMD,0x000,30*4,-1},
+};
+
+4. If VCMD is used, reserve memory for other usage before VCMD command buffer by
+setting the offset that VCMD command buffer starts from:
+
+    VCMD_BUF_POOL_OFFSET
+
+E.g., following macro will reserve 16MB in front of VCMD buffer, so VCMD buffer will
+starts from offset 0x1000000 on PCIE device memory.
+
+#define VCMD_BUF_POOL_OFFSET      0x1000000
+
+-- BUILD --
+
+You need a fully configured kernel source tree in order to build the
+driver. Please set the location of the kernel tree in the Makefile (KDIR).
+
+If you want some extra debug information in the kernel logs, you could
+define the HANTRODEC_DEBUG but please be aware that allot of things are traced
+with this option.
+
+Also you could set a particular device MAJOR in the 'hantrodec.c' if you don't want
+dynamic allocation.
+
+Just run in this dir:
+
+%make clean all
+
+-- INSTALL --
+
+The parameters that can be set when loading the driver are the HW IO base
+address and the assigned IRQ number.
+
+Set the correct values for the HW IO base address and the IRQ number if
+the default values compiled into the module are not valid.
+
+Install the Device Driver by running script driver_load.sh
+%./driver_load.sh
+
+
+Replace MAJOR with the correct value (i.e. read /proc/devices to found out
+the exact values).
+
+Make sure that you have RW rights for the newly created dev file (use 'chmod').
+
+The 'driver_load' script is provided for preparing all the things necessary for
+the driver to be usable. The script is using 'awk' to retrieve the device's
+major from /proc/devices. Remember to set the driver parameters.

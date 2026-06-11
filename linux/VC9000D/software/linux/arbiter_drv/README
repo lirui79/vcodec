@@ -1,0 +1,32 @@
+==============================================================================
+                            USAGE
+==============================================================================
+
+./arbiter_load.sh
+
+===============================================================================
+                            What is arbiter?
+===============================================================================
+
+it is an arbiter module that time-shares VPU core to different operating of
+different CMDBUF threads. it can be applied to multi-user virtual scenarios and
+can also be used in CMDBUF systems with diffrent priorities. Through software 
+configuration, the arbiter can adopt different arbitration strategies.
+
+===============================================================================
+                    Loading the arbiter kernel driver
+===============================================================================
+
+1. compile the kernel driver in software/linux/arbiter_drv
+> make clean all
+
+2. For testing load kernel driver with:
+> ./arbiter_load.sh
+
+3. Debugging:
+the device node should show up in the the directory /tmp/dev
+The device should show up in the list /proc/devices
+> ls /tmp/dev
+> cat /proc/devices
+Kernel messages can be viewed with
+> dmesg

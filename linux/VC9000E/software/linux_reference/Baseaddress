@@ -1,0 +1,26 @@
+#-------------------------------------------------------------------------------
+#-                                                                            --
+#-       This software is confidential and proprietary and may be used        --
+#-        only as expressly authorized by a licensing agreement from          --
+#-                                                                            --
+#-                            VeriSilicon Inc.                                --
+#-                                                                            --
+#-                   (C) COPYRIGHT 2015 VeriSilicon Inc                       --
+#-                            ALL RIGHTS RESERVED                             --
+#-                                                                            --
+#-                 The entire notice above must be reproduced                 --
+#-                  on all copies and should not be removed.                  --
+#-                                                                            --
+#-------------------------------------------------------------------------------
+
+# Used memory ddr/sram
+DDR = y
+
+ifeq ($(DDR),y)
+CHW_BASE_ADDRESS =0x40000000
+CSW_BASE_ADDRESS =0xB0000000
+else
+CHW_BASE_ADDRESS = 0x28000000
+CSW_BASE_ADDRESS =0x08000000
+endif
+
