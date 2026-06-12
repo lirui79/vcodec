@@ -11,33 +11,41 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                         include vcx vcmd cfg header                          **
+**                           include vcd vcmd header                           **
 *********************************************************************************/
 
-#ifndef _VCX_VCMD_CFG_H_
-#define _VCX_VCMD_CFG_H_
+#ifndef __VCD_VCMD_H__
+#define __VCD_VCMD_H__
+
+#include <linux/fs.h>
+#include "vcx_module_type.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
-/* submodule config */
-struct sub_mod_cfg {
-	enum subsys_module_id sub_mod_id;
 
-	unsigned int io_off; // submodule reg base (offset to vcmd reg-base)
-	unsigned int io_size;   // submodule io size
-
-	unsigned int rreg_id;  // start reg-id to read out when init driver,
-				   // 0xffff means not need to read.
-	unsigned int rreg_num;  // number of registers to read out when init driver
-};
-
-/*for all vcmds, the config info should be listed here for subsequent use*/
-struct vcmd_cfg {
-	unsigned long vcmd_base_addr;	//vcmd reg_base (bus address)
-	int vcmd_irq;
-	unsigned int sub_module_type; /*input vce=0,IM=1,vcd=2，jpege=3, jpegd=4*/
-	unsigned int priority; //the priority of vcmd
-	struct sub_mod_cfg submodule_cfg[SUB_MOD_MAX];
-};
+int hantrovcmd_open(struct inode *inode, struct file *filp);
+int hantrovcmd_release(struct inode *inode, struct file *filp);
+long hantrovcmd_ioctl(struct file *filp,
+				  unsigned int cmd, unsigned long arg);
+void *hantrovcmd_init(void *platformdev);
+//void hantrovcmd_cleanup(void *_vcmd_mgr);
+void vcmd_request_arbiter(void *_vcmd_mgr, u32 subsys_id);
+void vcmd_release_arbiter(void *_vcmd_mgr, u32 subsys_id);
+//int vcmd_pm_suspend(void *_vcmd_mgr);
+//int vcmd_pm_resume(void *_vcmd_mgr);
+u32 *get_submodule_regs_va(void *_vcmd_mgr, u32 subsys_id, u32 sub_mod_id);
+int in_vcmd_memory_region(void *_vcmd_mgr, unsigned long start, unsigned long end);
+#ifdef SUPPORT_48PA_MMU
+int _vcmd_memory_map(void *_vcmd_mgr, struct file *filp);
+#endif
 
 
-#endif /*_VCX_VCMD_CFG_H_*/
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /*__VCD_VCMD_H__ */

@@ -111,9 +111,10 @@ MDIR		:= hantro
 
 # # what to build
 
-$(vcodec_dev)-objs 	:=  vcx_driver.o vcmdswhwregisters.o bidirect_list.o vcx_priv_driver.o vcx_kthread.o
+$(vcodec_dev)-objs 	:=  vcx_driver.o vcmdswhwregisters.o bidirect_list.o vcm_driver.o vcx_kthread.o
 $(vcodec_dev)-objs  +=  vce_driver.o vce_vcmd_driver.o vce_normal_driver.o vce_abnormal_irq.o
-$(vcodec_dev)-objs  +=  vcd_driver.o vcd_vcmd_driver.o vcd_normal_driver.o vcd_abnormal_irq.o subsys.o
+$(vcodec_dev)-objs  +=  vcd_driver.o vcd_vcmd_driver.o vcd_normal_driver.o vcd_abnormal_irq.o
+$(vcodec_dev)-objs  +=  vcm_driver.o vcm_priv.o
 
 obj-m         += $(vcodec_dev).o
 

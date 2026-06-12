@@ -80,7 +80,7 @@
 #include <asm/io.h>
 #include <linux/stddef.h>
 
-#include "vcx_mmu.h"
+#include "vcx_mmu_priv.h"
 
 
 

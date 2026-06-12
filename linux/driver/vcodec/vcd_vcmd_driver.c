@@ -99,7 +99,7 @@
 #include <linux/platform_device.h>
 
 /* our own stuff */
-#include "subsys.h"
+#include "vcd_vcmd.h"
 #include "vcd_priv.h"
 #include "hantrovcmd.h"
 #include "vcx_kthread.h"
@@ -109,12 +109,13 @@
 #endif
 #include "vcx_vcmd_dbgfs.h"
 #include "vcd_abnormal_irq.h"
-#include "subsys_cfg.h"
+#include "vcd_vcmd_cfg.h"
 #ifdef AXI2TO1_SUPPORT
 #include "vcx_axi2to1.h"
 #endif
 
 #include "hantrodec.h"
+#include "vcx_mmu_priv.h"
 
 /****************************************************************
  * Macro definitions
@@ -151,7 +152,6 @@
  * external/global variables declarations
  ***************************************************************/
 /* PCI base register address (memalloc) */
-struct vcmd_config vcmd_core_array[MAX_SUBSYS_NUM];
 
 #ifdef SUPPORT_MMU
 extern unsigned int mmu_enable;
@@ -2624,6 +2624,125 @@ static u32 vcmd_reserve_submodule_IO(struct vcmd_subsys_info *subsys, u32 sub_mo
 	return 0;
 }
 
+#ifdef SUPPORT_MMU
+/**
+ * @brief MMU kernel map for vcmd driver
+ */
+static int vcmd_mmu_kernel_map(vcmd_mgr_t *vcmd_mgr, struct file *filp)
+{
+	struct kernel_addr_desc mmu_addr;
+
+#ifdef PCIE_EN
+	struct noncache_mem *mem_pcie = &vcmd_mgr->pcie_pool;
+	u32 offset = 0;
+
+	mmu_addr.bus_address = mem_pcie->pa - vcmd_mgr->pa_trans_offset;
+	mmu_addr.size = mem_pcie->size;
+	if (MMUKernelMemNodeMap(&mmu_addr, filp) != MMU_STATUS_OK)
+		return -1;
+	mem_pcie->mmu_ba = mmu_addr.mmu_bus_address;
+	vcmd_klog(LOGLVL_CONFIG, "%s: pool mmu_ba=0x%llx.\n", __func__,
+		(unsigned long long)mem_pcie->mmu_ba);
+
+	vcmd_mgr->mem_vcmd.mmu_ba = mem_pcie->mmu_ba + offset;
+	offset += vcmd_mgr->mem_vcmd.size;
+	vcmd_mgr->mem_status.mmu_ba = mem_pcie->mmu_ba + offset;
+	offset += vcmd_mgr->mem_status.size;
+	vcmd_mgr->mem_regs.mmu_ba = mem_pcie->mmu_ba + offset;
+#else
+	struct noncache_mem mem[3];
+	int i;
+
+	mem[0] = vcmd_mgr->mem_vcmd,
+	mem[1] = vcmd_mgr->mem_status,
+	mem[2] = vcmd_mgr->mem_regs
+
+	for (i = 0; i < 3; i++) {
+		mmu_addr.bus_address = mem[i].pa;
+		mmu_addr.size = mem[i].size;
+		if (MMUKernelMemNodeMap(&mmu_addr, filp) != MMU_STATUS_OK) {
+			vcmd_klog(LOGLVL_ERROR, "Init[%s] mmu map mem failed\n", __func__);
+			return -1;
+		}
+		mem[i].mmu_ba = mmu_addr.mmu_bus_address;
+		vcmd_klog(LOGLVL_FLOW, "Init[%s]: mem->mmu_ba=0x%llx.\n", __func__,
+				(unsigned long long)mem[i].mmu_ba);
+	}
+#endif
+
+	return 0;
+}
+#endif
+
+/**
+ * @brief config modules for vcmd driver
+ */
+static int vcmd_config_modules(vcmd_mgr_t *vcmd_mgr)
+{
+	int i;
+	struct vcmd_subsys_info *subsys;
+#ifdef SUPPORT_MMU
+	enum MMUStatus mmu_status = MMU_STATUS_FALSE;
+	int ret = 0;
+#endif
+
+	for (i = 0; i < vcmd_mgr->subsys_num; i++) {
+		subsys = &vcmd_mgr->core_array[i];
+		/* config AXIFE*/
+#ifdef SUPPORT_AXIFE
+		if (subsys->hwregs[SUB_MOD_AXIFE0])
+			AXIFEEnable(subsys->hwregs[SUB_MOD_AXIFE0]);//AXIFEEnable(subsys->hwregs[SUB_MOD_AXIFE0], 1);
+		if (subsys->hwregs[SUB_MOD_AXIFE1])
+			AXIFEEnable(subsys->hwregs[SUB_MOD_AXIFE1]);//AXIFEEnable(subsys->hwregs[SUB_MOD_AXIFE1], 1);
+#endif
+		/* config MMU */
+#ifdef SUPPORT_MMU
+		if (subsys->hwregs[SUB_MOD_MMU0]) {
+			mmu_status = MMUInit(subsys->hwregs[SUB_MOD_MMU0]);
+			if (mmu_status == MMU_STATUS_NOT_FOUND) {
+				vcmd_klog(LOGLVL_ERROR, "MMU does not exist!\n");
+				return -1;
+			} else if (mmu_status != MMU_STATUS_OK) {
+				return -2;
+			} else {
+				vcmd_klog(LOGLVL_BRIEF, "MMU detected!\n");
+			}
+		}
+#endif
+
+		/* config AXI2TO1 */
+#ifdef AXI2TO1_SUPPORT
+		if (subsys->hwregs[SUB_MOD_AXI2TO1]) {
+			if (AXI2TO1_init(subsys->hwregs[SUB_MOD_AXI2TO1]) < 0)
+				return -5;
+		}
+#endif
+	}
+	/* config MMU*/
+#ifdef SUPPORT_MMU
+	mmu_status = MMUEnable(vcmd_mgr->mmu_hwregs);
+	if (mmu_status != MMU_STATUS_OK) {
+		vcmd_klog(LOGLVL_ERROR, "MMUEnable: MMU enable failed\n");
+		return -3;
+	}
+	vcmd_mgr->mmu_enable = mmu_enable;
+	vcmd_klog(LOGLVL_CONFIG, "MMU %s.\n", vcmd_mgr->mmu_enable ? "ENABLE" : "DISABLE");
+
+	if (vcmd_mgr->mmu_enable) {
+		ret = vcmd_mmu_kernel_map(vcmd_mgr, NULL);
+		if (ret < 0)
+			return -4;
+	}
+	for (i = 0; i < vcmd_mgr->subsys_num; i++) {
+		vcmd_mgr->dev_ctx[i].mmu_enable = vcmd_mgr->mmu_enable;
+		vcmd_mgr->dev_ctx[i].mmu_reg_mem_ba = vcmd_mgr->mem_regs.mmu_ba +
+							i * SLOT_SIZE_REGBUF;
+	}
+#endif
+
+	return 0;
+}
+
 /**
  * @brief reserve IO resources for vcmd driver.
  */
@@ -2658,7 +2777,7 @@ static int vcmd_reserve_IO(vcmd_mgr_t *vcmd_mgr)
 			continue;
 		}
 		dev->hwregs = subsys->hwregs[SUB_MOD_VCMD];
-		vcmd_core_array[i].submodule_vcmd_virtual_address = dev->hwregs;
+//		vcmd_core_array[i].submodule_vcmd_virtual_address = dev->hwregs;
 
 		/*read hwid and check validness and store it*/
 		hwid = (u32)ioread32((void __iomem *)dev->hwregs);
@@ -2858,51 +2977,50 @@ static void read_main_module_all_registers(vcmd_mgr_t *vcmd_mgr)
 /**
  * @brief convert subsys info to core array info of vcmd driver context.
  */
-static void SubsysToVcmdCoreCfg(struct subsys_config *subsys,
-								int subsys_num, vcmd_mgr_t *vcmd_mgr)
+static void SubsysToVcmdCoreCfg(vcmd_mgr_t *vcmd_mgr)
 {
-	int i, j = 0;
-	struct vcmd_subsys_info *core_array;
+	int i, k, array_sz;
+	struct vcmd_subsys_info *subsys;
+	struct sub_mod_cfg *mod_cfg;
+	enum subsys_module_id mod_id;
 
-	/* To plug into hantro_vcmd.c */
-	for (i = 0; i < subsys_num; i++) {
-		if (subsys[i].submodule_iosize[HW_VCMD]) {
-			core_array = &vcmd_mgr->core_array[j];
-			core_array->irq = subsys[i].irq;
-			core_array->reg_base = subsys[i].base_addr;
-			core_array->sub_module_type = subsys[i].subsys_type;
+	array_sz = ARRAY_SIZE(vcmd_core_array);
 
-			core_array->reg_off[SUB_MOD_VCMD] = 0;
-			core_array->reg_off[SUB_MOD_MAIN] = subsys[i].submodule_offset[HW_VCD];
-			core_array->reg_off[SUB_MOD_DEC400] = subsys[i].submodule_offset[HW_DEC400];
-			core_array->reg_off[SUB_MOD_MMU] = subsys[i].submodule_offset[HW_MMU];
-			core_array->reg_off[SUB_MOD_MMU_WR] = subsys[i].submodule_offset[HW_MMU_WR];
-			core_array->reg_off[SUB_MOD_AXIFE] = subsys[i].submodule_offset[HW_AXIFE];
-			core_array->reg_off[SUB_MOD_UFBC] = subsys[i].submodule_offset[HW_AFBC];
-			core_array->reg_off[SUB_MOD_AXI2TO1] = subsys[i].submodule_offset[HW_AXI2TO1];
+	/* To plug into vcx_vcmd_driver.c */
+	for (i = 0; i < array_sz; i++) {
+		if (vcmd_core_array[i].vcmd_base_addr) {
+			subsys = &vcmd_mgr->core_array[vcmd_mgr->subsys_num];
+			subsys->irq = vcmd_core_array[i].vcmd_irq;
+			/* reg_base = vcmd_base_addr + reg_base_offset,
+			 * but now reg_base_offset is 0, will be added later
+			 */
+			subsys->reg_base = vcmd_core_array[i].vcmd_base_addr +
+							   /* vcmd_mgr->reg_base_offset */ 0;
+			subsys->sub_module_type = vcmd_core_array[i].sub_module_type;
+			subsys->vcmd_priority = vcmd_core_array[i].priority;
 
-			core_array->io_size[SUB_MOD_VCMD] = subsys[i].submodule_iosize[HW_VCMD];
-			core_array->io_size[SUB_MOD_MAIN] = subsys[i].submodule_iosize[HW_VCD];
-			core_array->io_size[SUB_MOD_DEC400] = subsys[i].submodule_iosize[HW_DEC400];
-			core_array->io_size[SUB_MOD_MMU] = subsys[i].submodule_iosize[HW_MMU];
-			core_array->io_size[SUB_MOD_MMU_WR] = subsys[i].submodule_iosize[HW_MMU_WR];
-			core_array->io_size[SUB_MOD_AXIFE] = subsys[i].submodule_iosize[HW_AXIFE];
-			core_array->io_size[SUB_MOD_UFBC] = subsys[i].submodule_iosize[HW_AFBC];
-			core_array->io_size[SUB_MOD_AXI2TO1] = subsys[i].submodule_iosize[HW_AXI2TO1];
+			for (k = 0; k < SUB_MOD_MAX; k++) {
+				mod_cfg = &vcmd_core_array[i].submodule_cfg[k];
+				mod_id = mod_cfg->sub_mod_id;
+				if (mod_id < SUB_MOD_MAX) {
+					subsys->reg_off[mod_id] = mod_cfg->io_off;
+					if (mod_cfg->io_off != 0xffff) {
+						subsys->io_size[mod_id] = mod_cfg->io_size;
+						subsys->rreg_id[mod_id] = mod_cfg->rreg_id;
+						subsys->rreg_num[mod_id] = mod_cfg->rreg_num;
+					}
+				} else {
+					vcmd_klog(LOGLVL_ERROR, "wrong sub-module id in vcmd_core_array[%d].submodule_cfg[%d]\n",
+							  i, k);
+				}
+			}
 
-			core_array->hwregs[SUB_MOD_MAIN] = vcmd_core_array[i].submodule_vcd_virtual_address;
-			core_array->hwregs[SUB_MOD_DEC400] = vcmd_core_array[i].submodule_dec400_virtual_address;
-			core_array->hwregs[SUB_MOD_MMU] = vcmd_core_array[i].submodule_MMU_virtual_address;
-			core_array->hwregs[SUB_MOD_MMU_WR] = vcmd_core_array[i].submodule_MMUWrite_virtual_address;
-			core_array->hwregs[SUB_MOD_AXIFE] = vcmd_core_array[i].submodule_axife_virtual_address;
-			core_array->hwregs[SUB_MOD_AXI2TO1] = vcmd_core_array[i].submodule_axi2to1_virtual_address;
-
-			j++;
+			vcmd_mgr->subsys_num++;
 		}
 	}
-	vcmd_mgr->subsys_num = j;
-	vcmd_klog(LOGLVL_CONFIG, "%d VCMD cores found\n", j);
+	vcmd_klog(LOGLVL_CONFIG, "%d VCMD cores found\n", vcmd_mgr->subsys_num);
 }
+
 
 /**
  * @brief vcmd driver initialization
@@ -2911,8 +3029,7 @@ static void SubsysToVcmdCoreCfg(struct subsys_config *subsys,
  * @param void *platformdev: platform device handler
  * @return void *: NULL: failed; other: vcmd driver handler.
  */
-void *hantrovcmd_init(struct subsys_config *subsys,
-						int subsys_num, void *platformdev)
+void *hantrovcmd_init(void *platformdev)
 {
 	int result;
 	struct hantrovcmd_dev *dev_ctx;
@@ -2923,22 +3040,21 @@ void *hantrovcmd_init(struct subsys_config *subsys,
 		return NULL;
 
 	memset(vcmd_mgr, 0, sizeof(vcmd_mgr_t));
-	SubsysToVcmdCoreCfg(subsys, subsys_num, vcmd_mgr);
+	SubsysToVcmdCoreCfg(vcmd_mgr);//	SubsysToVcmdCoreCfg(subsys, subsys_num, vcmd_mgr);
 
 	if (!vcmd_mgr->subsys_num)
 		goto err;
 
-	subsys_num = vcmd_mgr->subsys_num;
 	vcmd_mgr->platformdev = (struct platform_device *)platformdev;
 
 	vcmd_mgr->mem_vcmd.size = ALIGN_4K(SLOT_NUM_CMDBUF * SLOT_SIZE_CMDBUF);
 	vcmd_mgr->mem_status.size = ALIGN_4K(SLOT_NUM_CMDBUF * SLOT_SIZE_STATUSBUF);
-	vcmd_mgr->mem_regs.size = ALIGN_4K(subsys_num * SLOT_SIZE_REGBUF);
+	vcmd_mgr->mem_regs.size = ALIGN_4K(vcmd_mgr->subsys_num * SLOT_SIZE_REGBUF);
 	result = vcmd_init(vcmd_mgr);
 	if (result)
 		goto err;
 
-	dev_ctx = vmalloc(sizeof(struct hantrovcmd_dev) * subsys_num);
+	dev_ctx = vmalloc(sizeof(struct hantrovcmd_dev) * vcmd_mgr->subsys_num);
 	if (!dev_ctx)
 		goto err;
 
@@ -2964,6 +3080,11 @@ void *hantrovcmd_init(struct subsys_config *subsys,
 	result = vcmd_reserve_IO(vcmd_mgr);
 	if (result < 0)
 		goto err0;
+
+	result = vcmd_config_modules(vcmd_mgr);
+	if (result < 0)
+		goto err;
+
 	vcmd_reset_asic(vcmd_mgr);
 
 #ifdef SUPPORT_DBGFS

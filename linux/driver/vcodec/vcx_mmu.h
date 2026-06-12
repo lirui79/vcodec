@@ -219,34 +219,7 @@ struct page_table_switch {
 #define HANTRO_IOC_MMU_MAXNR 6
 #define MAX_SUBSYS_NUM 4 /* up to 4 subsystem (temporary) */
 #define HXDEC_MAX_CORES MAX_SUBSYS_NUM /* used in hantro_dec.c */
-/* Init MMU, should be called in driver init function. */
-enum MMUStatus MMUInit(volatile unsigned char *hwregs);
-/* Clean up all data in MMU, should be called in driver cleanup function
- * when rmmod driver
- */
-enum MMUStatus MMUCleanup(void);
-/* The function should be called in driver realease function
- * when driver exit unnormally
- */
-enum MMUStatus MMURelease(void *filp);
 
-enum MMUStatus MMUSetup(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
-enum MMUStatus MMUEnable(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
-
-/* Used in kernel to map buffer */
-enum MMUStatus MMUKernelMemNodeMap(struct kernel_addr_desc *addr, void *filp);
-
-/* Used in kernel to unmap buffer */
-enum MMUStatus MMUKernelMemNodeUnmap(struct kernel_addr_desc *addr);
-
-/* if support 48PA MMU, create page table for multi-process */
-enum MMUStatus MMUCreatePageTable(void *filp);
-
-unsigned int GetMMUPageTableArraySize(void);
-
-unsigned long long GetMMUAddress(void);
-long MMUIoctl(unsigned int cmd, void *filp, unsigned long arg,
-	      volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
 
 #ifdef __cplusplus
 }

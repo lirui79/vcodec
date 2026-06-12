@@ -32,12 +32,17 @@ typedef struct {
     int (*resume)(struct device *dev, void *priv, int vcmd_supperted);
 } vcx_operations_t;
 
+enum DEVID {
+    DEVID_VCX = 0,
+    DEVID_VCE = 1,
+    DEVID_VCD = 2,
+};
 
 typedef struct {
-    char                            *name;////// 设备节点   /dev/hantrovcx  /dev/hantroenc  /dev/hantrodec
+    const char                      *name;////// 设备节点   /dev/hantrovcx  /dev/hantroenc  /dev/hantrodec
     struct cdev                      cdev;////// 字符设备核心结构
     dev_t                            devno;///// 完整的设备号 (Major + Minor)
-    unsigned int                     devid;///// 设备索引 (0, 1, 2)   0- /dev/hantrovcx   1- /dev/hantroenc  2- /dev/hantrodec
+    unsigned int                     devid;///// 设备索引 (DEVID_VCX, DEVID_VCE, DEVID_VCD)   DEVID_VCX- /dev/hantrovcx   DEVID_VCE- /dev/hantroenc  DEVID_VCD- /dev/hantrodec
     void                            *priv;////// vcmdmgr pointer
     struct platform_device          *pdev;////// 指向 struct platform_device 结构的指针
     struct device                   *dev;/////// 指向 struct device 结构的指针

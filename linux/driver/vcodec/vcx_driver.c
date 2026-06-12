@@ -87,29 +87,35 @@ static struct   class *vcx_class = NULL;
 static dev_t    base_dev_no = 0;   // 起始设备号
 static int      major_num = 0;
 
+
+
+// ------------------------------------------------------------------
+// 1. Platform Device 结构体定义
+// ------------------------------------------------
+
 static vcx_priv_t vcx_priv[] = {
     {
-       .name  =  "hantrovcx",
+       .name  =  NULL,
        .devno =  0x00,
-       .devid =  0,
+       .devid =  DEVID_VCX,
        .priv  =  NULL,
        .pdev  =  NULL,
        .dev   =  NULL,
        .ops   =  NULL,
     },
     {
-       .name  =  "hantroenc",
+       .name  =  NULL,
        .devno =  0x00,
-       .devid =  1,
+       .devid =  DEVID_VCE,
        .priv  =  NULL,
        .pdev  =  NULL,
        .dev   =  NULL,
        .ops   =  NULL,
     },
     {
-       .name  =  "hantrodec",
+       .name  =  NULL,
        .devno =  0x00,
-       .devid =  2,
+       .devid =  DEVID_VCD,
        .priv  =  NULL,
        .pdev  =  NULL,
        .dev   =  NULL,
@@ -119,7 +125,7 @@ static vcx_priv_t vcx_priv[] = {
 
 
 // ------------------------------------------------------------------
-// 3. Platform Driver 回调 (Probe/Remove)
+// 2. Platform Driver 回调 (Probe/Remove)
 // ------------------------------------------------------------------
 
 int  vcx_create_devnode(vcx_priv_t *priv, const struct file_operations *ops) {
@@ -148,6 +154,69 @@ int  vcx_create_devnode(vcx_priv_t *priv, const struct file_operations *ops) {
     }
     return 0;
 }
+
+
+void _dbg_log_instr(u32 offset, u32 instr, u32 *size, char *str)
+{
+	u32 opcode = instr & OPCODE_MASK;
+
+	if (opcode == OPCODE_WREG) {
+		int length = ((instr >> 16) & 0x3FF);
+
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s %s %d 0x%x]\n",
+			offset, instr, "WREG", ((instr >> 26) & 0x1) ? "FIX" : "",
+			   length, (instr & 0xFFFF));
+		*size = ((length + 2) >> 1) << 1;
+	} else if (opcode == OPCODE_END) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s]\n", offset,
+			instr, "END");
+		*size = 2;
+	} else if (opcode == OPCODE_NOP) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s]\n", offset,
+			instr, "NOP");
+		*size = 2;
+	} else if (opcode == OPCODE_RREG) {
+		int length = ((instr >> 16) & 0x3FF);
+
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s %s %d 0x%x]\n",
+			offset, instr, "RREG", ((instr >> 26) & 0x1) ? "FIX" : "",
+			   length, (instr & 0xFFFF));
+		*size = 4;
+	} else if (opcode == OPCODE_JMP) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s %s %s]\n",
+			offset, instr, "JMP", ((instr >> 26) & 0x1) ? "RDY" : "",
+			   ((instr >> 25) & 0x1) ? "IE" : "");
+		*size = 4;
+	} else if (opcode == OPCODE_STALL) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s %s 0x%x]\n",
+			offset, instr, "STALL", ((instr >> 26) & 0x1) ? "IM" : "",
+			   (instr & 0xFFFF));
+		*size = 2;
+	} else if (opcode == OPCODE_CLRINT) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s %u 0x%x]\n",
+			offset, instr, "CLRINT", (instr >> 25) & 0x3,
+			   (instr & 0xFFFF));
+		*size = 2;
+	} else if (opcode == OPCODE_M2M) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s]\n",
+			offset, instr, "M2M");
+		*size = 6;
+	} else if (opcode == OPCODE_MSET) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s]\n",
+			offset, instr, "MSET");
+		*size = 4;
+	} else if (opcode == OPCODE_M2MP) {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s]\n",
+			offset, instr, "M2MP");
+		*size = 6;
+	} else {
+		sprintf(str, "current cmdbuf data %u = 0x%08x => [%s]\n",
+			offset, instr, "UNKNOWN CMD");
+		*size = 1;
+	}
+}
+
+
 static int vcx_vcodec_probe(struct platform_device *pdev)
 {
     vcx_priv_t *priv = platform_get_drvdata(pdev);
@@ -270,7 +339,7 @@ static const struct dev_pm_ops vcx_vcodec_pm_ops = {
 #endif
 
 // ------------------------------------------------------------------
-// 4. 驱动与设备定义
+// 3. 驱动与设备定义
 // ------------------------------------------------------------------
 
 static const struct of_device_id vcx_vcodec_of_match[] = {
@@ -280,6 +349,9 @@ static const struct of_device_id vcx_vcodec_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, vcx_vcodec_of_match);
 
+// ------------------------------------------------------------------
+// 4. Platform Driver 结构体定义
+// ------------------------------------------------------------------
 static struct platform_driver vcx_vcodec_driver = {
     .probe  = vcx_vcodec_probe,
     .remove = vcx_vcodec_remove,
@@ -300,6 +372,12 @@ static int __init vcx_vcodec_init(void)
 {
     int ret = 0, i = 0;
     struct platform_device *pdev = NULL;
+    vcx_priv_t *priv = NULL;
+    static const char *devName[] = {
+        "hantrovcx",
+        "hantroenc",
+        "hantrodec",
+    };
 
     // 1. 创建类
     vcx_class = class_create(CLASS_NAME);
@@ -338,30 +416,32 @@ static int __init vcx_vcodec_init(void)
         // 这里依靠 driver.name 和 pdev->name 匹配，或者依赖 id 匹配。
         // 更严谨的做法是构建一个简单的 of_node，但为了演示简洁，我们依赖 name/id 匹配机制。
         // 如果驱动中有 .of_match_table，内核会尝试匹配。如果没有 of_node，它会 fallback 到 name 匹配。
-        //vcx_priv[i].class = vcx_class;
-        switch (i) {
-            case 0:
-                vcx_init_ops(&vcx_priv[i]);
+
+        priv = &vcx_priv[i];
+        switch (priv->devid) {
+            case DEVID_VCX:
+                vcx_init_ops(priv);
                 break;
-            case 1:
-                vce_init_ops(&vcx_priv[i]);
+            case DEVID_VCE:
+                vce_init_ops(priv);
                 break;
-            case 2:
-                vcd_init_ops(&vcx_priv[i]);
+            case DEVID_VCD:
+                vcd_init_ops(priv);
                 break;
             default:
-                vcx_init_ops(&vcx_priv[0]);
+                vcx_init_ops(priv);
                 break;
               break;
         }
-        platform_set_drvdata(pdev, &vcx_priv[i]);
+        priv->name = devName[priv->devid];
+        platform_set_drvdata(pdev, priv);
         ret = platform_device_add(pdev);
         if (ret) {
             platform_device_put(pdev);
             goto err_unregister_devices;
         }
         pr_info("Registered platform device: %s.%d\n", VCX_DRIVER_NAME, i);
-        vcx_priv[i].pdev = pdev;
+        priv->pdev = pdev;
     }
 
     return 0;

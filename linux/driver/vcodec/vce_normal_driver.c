@@ -105,6 +105,7 @@
 #include "vce_priv.h"
 /* our own stuff */
 #include "vcx_driver.h"
+#include "vcx_mmu_priv.h"
 #include "vce_normal_cfg.h"
 
 /****************************************************************

@@ -65,7 +65,7 @@
  * subsystem0 is defined in default.
  */
 #define SUBSYSTEM0    1
-#define SUBSYSTEM1    0
+#define SUBSYSTEM1    1
 
 /*******************************************************************
  *     subsys IO base and subsys core offset cfg
@@ -101,6 +101,7 @@
 #endif
 #define SUBSYS1_VCMD_OFFSET             (0)
 #define SUBSYS1_CUTREE_OFFSET           (0x1000)
+#define SUBSYS1_VCE_OFFSET              (0x1000)
 #define SUBSYS1_MMU_OFFSET              (0xFFFF)
 #define SUBSYS1_MMU1_OFFSET             (0xFFFF)
 #define SUBSYS1_AXIFE_OFFSET            (0xFFFF)

@@ -61,35 +61,38 @@
 
 #include "vce_cfg.h"
 #include "vcx_vcmd_cfg.h"
+#include "vcx_module_type.h"
 
 
-static struct vcmd_config vcmd_core_array[] = {
-	/* subsys 0 */
-	{SUBSYS_0_IO_ADDR, VCMD0_IRQ, 0, 0,
-		{ {SUB_MOD_VCMD, SUBSYS0_VCMD_OFFSET, VCMD_REGISTER_SIZE * 4, 0xffff, 0},
-		{SUB_MOD_MAIN, SUBSYS0_VCE_OFFSET, ENCODER_REGISTER_SIZE * 4, 0, ASIC_SWREG_AMOUNT},
-		{SUB_MOD_L2CACHE, SUBSYS0_L2CACHE_OFFSET, L2CACHE_REGISTER_SIZE * 4, 0, 1},
-		{SUB_MOD_MMU0, SUBSYS0_MMU_OFFSET, MMU_REGISTER_SIZE * 4, 0xffff, 0},
-		{SUB_MOD_MMU1, SUBSYS0_MMU1_OFFSET, MMU_REGISTER_SIZE * 4, 0xffff, 0},
-		{SUB_MOD_DEC400, SUBSYS0_DEC400_OFFSET, DEC400_REGISTER_SIZE * 4, 0, 0x2b},
-		{SUB_MOD_AXIFE0, SUBSYS0_AXIFE_OFFSET, AXIFE_REGISTER_SIZE * 4, 0, 1},
-		{SUB_MOD_AXIFE1, SUBSYS0_AXIFE1_OFFSET, AXIFE_REGISTER_SIZE * 4, 0, 1},
-		{SUB_MOD_UFBC, SUBSYS0_UFBC_OFFSET, UFBC_REGISTER_SIZE * 4, 0, 10},
-		{SUB_MOD_AXI2TO1, SUBSYS0_AXI2TO1_OFFSET, AXI2TO1_REGISTER_SIZE * 4, 0xffff, 0} },
+static struct vcmd_cfg vcmd_core_array[] = {
+/* subsys 0 base_addr,       vcmd_irq,         sub_module_type,                   priority*/
+	{SUBSYS_0_IO_ADDR,       VCMD0_IRQ,        VCMD_TYPE_ENCODER,                 0,
+//        sub_mod_id,               io_off,                    io_size,                       rreg_id,     rreg_num
+		{ {SUB_MOD_VCMD,            SUBSYS0_VCMD_OFFSET,       VCMD_REGISTER_SIZE * 4,        0xffff,      0},
+		{SUB_MOD_MAIN,              SUBSYS0_VCE_OFFSET,        ENCODER_REGISTER_SIZE * 4,     0,           ASIC_SWREG_AMOUNT},
+		{SUB_MOD_L2CACHE,           SUBSYS0_L2CACHE_OFFSET,    L2CACHE_REGISTER_SIZE * 4,     0,           1},
+		{SUB_MOD_MMU0,              SUBSYS0_MMU_OFFSET,        MMU_REGISTER_SIZE * 4,         0xffff,      0},
+		{SUB_MOD_MMU1,              SUBSYS0_MMU1_OFFSET,       MMU_REGISTER_SIZE * 4,         0xffff,      0},
+		{SUB_MOD_DEC400,            SUBSYS0_DEC400_OFFSET,     DEC400_REGISTER_SIZE * 4,      0,           0x2b},
+		{SUB_MOD_AXIFE0,            SUBSYS0_AXIFE_OFFSET,      AXIFE_REGISTER_SIZE * 4,       0,           1},
+		{SUB_MOD_AXIFE1,            SUBSYS0_AXIFE1_OFFSET,     AXIFE_REGISTER_SIZE * 4,       0,           1},
+		{SUB_MOD_UFBC,              SUBSYS0_UFBC_OFFSET,       UFBC_REGISTER_SIZE * 4,        0,           10},
+		{SUB_MOD_AXI2TO1,           SUBSYS0_AXI2TO1_OFFSET,    AXI2TO1_REGISTER_SIZE * 4,     0xffff,      0} },
 	},
 #if SUBSYSTEM1
-	/* subsys 1 */
-	{SUBSYS_1_IO_ADDR, VCMD1_IRQ, 1, 0,
-		{ {SUB_MOD_VCMD, SUBSYS0_VCMD_OFFSET, VCMD_REGISTER_SIZE * 4, 0xffff, 0},
-		{SUB_MOD_MAIN, SUBSYS1_CUTREE_OFFSET, IM_REGISTER_SIZE * 4, 0, ASIC_SWREG_AMOUNT},
-		{SUB_MOD_L2CACHE, SUBSYS1_L2CACHE_OFFSET, L2CACHE_REGISTER_SIZE * 4, 0, 1},
-		{SUB_MOD_MMU0, SUBSYS1_MMU_OFFSET, MMU_REGISTER_SIZE * 4, 0xffff, 0},
-		{SUB_MOD_MMU1, SUBSYS1_MMU1_OFFSET, MMU_REGISTER_SIZE * 4, 0xffff, 0},
-		{SUB_MOD_DEC400, SUBSYS1_DEC400_OFFSET, DEC400_REGISTER_SIZE * 4, 0, 0x2b},
-		{SUB_MOD_AXIFE0, SUBSYS1_AXIFE_OFFSET, AXIFE_REGISTER_SIZE * 4, 0, 1},
-		{SUB_MOD_AXIFE1, SUBSYS1_AXIFE1_OFFSET, AXIFE_REGISTER_SIZE * 4, 0, 1},
-		{SUB_MOD_UFBC, SUBSYS1_UFBC_OFFSET, UFBC_REGISTER_SIZE * 4, 0, 10},
-		{SUB_MOD_AXI2TO1, SUBSYS1_AXI2TO1_OFFSET, AXI2TO1_REGISTER_SIZE * 4, 0xffff, 0} },
+/* subsys 1 base_addr,       vcmd_irq,         sub_module_type,                   priority*/
+	{SUBSYS_1_IO_ADDR,       VCMD1_IRQ,        VCMD_TYPE_ENCODER,                 0,
+//        sub_mod_id,               io_off,                    io_size,                       rreg_id,     rreg_num
+		{ {SUB_MOD_VCMD,            SUBSYS1_VCMD_OFFSET,       VCMD_REGISTER_SIZE * 4,        0xffff,      0},
+		{SUB_MOD_MAIN,              SUBSYS1_CUTREE_OFFSET,     IM_REGISTER_SIZE * 4,          0,           ASIC_SWREG_AMOUNT},
+		{SUB_MOD_L2CACHE,           SUBSYS1_L2CACHE_OFFSET,    L2CACHE_REGISTER_SIZE * 4,     0,           1},
+		{SUB_MOD_MMU0,              SUBSYS1_MMU_OFFSET,        MMU_REGISTER_SIZE * 4,         0xffff,      0},
+		{SUB_MOD_MMU1,              SUBSYS1_MMU1_OFFSET,       MMU_REGISTER_SIZE * 4,         0xffff,      0},
+		{SUB_MOD_DEC400,            SUBSYS1_DEC400_OFFSET,     DEC400_REGISTER_SIZE * 4,      0,           0x2b},
+		{SUB_MOD_AXIFE0,            SUBSYS1_AXIFE_OFFSET,      AXIFE_REGISTER_SIZE * 4,       0,           1},
+		{SUB_MOD_AXIFE1,            SUBSYS1_AXIFE1_OFFSET,     AXIFE_REGISTER_SIZE * 4,       0,           1},
+		{SUB_MOD_UFBC,              SUBSYS1_UFBC_OFFSET,       UFBC_REGISTER_SIZE * 4,        0,           10},
+		{SUB_MOD_AXI2TO1,           SUBSYS1_AXI2TO1_OFFSET,    AXI2TO1_REGISTER_SIZE * 4,     0xffff,      0} },
 	},
 #endif
 };

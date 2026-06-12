@@ -56,6 +56,7 @@
  */
 
 #include "hantrodec.h"
+#include "vcx_mmu_priv.h"
 #include "vcmdswhwregisters.h"
 #include "hantrodec_defs.h"
 #include <asm/io.h>
@@ -104,19 +105,20 @@
 #endif
 #include <linux/time.h>
 
-#include "subsys.h"
+#include "vcd_normal_cfg.h"
 #ifdef SUPPORT_AXIFE
 #include "vcx_axife.h"
 #endif
 #ifdef SUPPORT_AFBC
 #include "vcx_afbc.h"
 #endif
-#include "subsys_cfg.h"
+
 #ifdef AXI2TO1_SUPPORT
 #include "vcx_axi2to1.h"
 #endif
 #include "vcd_priv.h"
 
+#include "vcd_vcmd.h"
 #include "vcx_vcmd_priv.h"
 
 #undef PDEBUG
@@ -224,7 +226,6 @@ int is_clk_on;
 struct timer_list timer;
 #endif
 
-extern struct vcmd_config vcmd_core_array[MAX_SUBSYS_NUM];
 
 #ifdef SUPPORT_DBGFS
 /*debugfs for performance statistics*/
@@ -318,13 +319,28 @@ struct core_bind {
 	const void *dec_inst;
 };
 
+/* internal config struct (translated from SubsysDesc & CoreDesc) */
+struct subsys_cfg {
+	unsigned long base_addr;
+	int irq;
+	/* identifier for each subsys vc8000e=0,
+	 * IM=1,vcd=2,jpege=3,jpegd=4
+	 */
+	u32 subsys_type;
+	u32 submodule_offset[HW_CORE_MAX]; /* in bytes */
+	u16 submodule_iosize[HW_CORE_MAX]; /* in bytes */
+
+	volatile u8 *submodule_hwregs[HW_CORE_MAX]; /* virtual address */
+	int has_apbfilter[HW_CORE_MAX];
+};
+
 static struct SubsysMgr {
 	struct platform_device *platformdev;
 	/* for non-vcmd */
 	unsigned long multicorebase[HXDEC_MAX_CORES];
 	int irq[HXDEC_MAX_CORES];
 	int iosize[HXDEC_MAX_CORES];
-	struct subsys_config vpu_subsys[MAX_SUBSYS_NUM];
+	struct subsys_cfg    vpu_subsys[MAX_SUBSYS_NUM];
 	struct apbfilter_cfg apbfilter_cfg[MAX_SUBSYS_NUM][HW_CORE_MAX];
 	struct axife_cfg axife_cfg[MAX_SUBSYS_NUM];
 	int elements;
@@ -2965,10 +2981,12 @@ static void auxcore_ctx_init(void)
 
 	for (i = 0; i < MAX_SUBSYS_NUM; i++) {
 		for (j = 0; j < HW_CORE_MAX; j++) {
-			if (j == HW_VCMD)
-				hwregs = vcmd_core_array[i].submodule_vcmd_virtual_address;
-			else
+			if (j == HW_VCMD) {
+				hwregs = ((vcmd_mgr_t*) subsys_mgr.vcmd_mgr)->dev_ctx[i].subsys_info->hwregs[SUB_MOD_VCMD];//hwregs = vcmd_core_array[i].submodule_vcmd_virtual_address;
+			 } else {
 				hwregs = subsys_mgr.hantrodec_data.hwregs[i][j];
+			}
+
 			if (!hwregs)
 				continue;
 
@@ -3047,6 +3065,64 @@ out:
 }
 #endif
 
+
+static void CheckSubsysCoreArray(struct subsys_cfg *subsys, int *subsys_num, int *vcmd)
+{
+	int num = ARRAY_SIZE(subsys_array);
+	int i, j;
+
+	memset(subsys, 0, sizeof(struct subsys_cfg) * MAX_SUBSYS_NUM);
+	for (i = 0; i < num; i++) {
+		subsys[i].base_addr = subsys_array[i].base_addr + gBaseHdwr;
+		subsys[i].irq = -1;
+		for (j = 0; j < HW_CORE_MAX; j++) {
+			subsys[i].submodule_offset[j] = 0xffff;
+			subsys[i].submodule_iosize[j] = 0;
+			subsys[i].submodule_hwregs[j] = NULL;
+		}
+	}
+
+	for (i = 0; i < ARRAY_SIZE(core_array); i++) {
+		if (!subsys[core_array[i].subsys_idx].base_addr) {
+			/* undefined subsystem */
+			continue;
+		}
+
+		if (core_array[i].offset == 0xFFFF)
+			continue;
+		if (core_array[i].core_type == HW_VCDJ)
+			core_array[i].core_type = HW_VCD;
+		subsys[core_array[i].subsys_idx].submodule_offset[core_array[i].core_type] =
+			core_array[i].offset;
+		subsys[core_array[i].subsys_idx].submodule_iosize[core_array[i].core_type] =
+			core_array[i].reg_size;
+		if (subsys[core_array[i].subsys_idx].irq != -1 &&
+		    core_array[i].irq != -1) {
+			if (subsys[core_array[i].subsys_idx].irq !=
+			    core_array[i].irq) {
+				pr_info("hantrodec: hw core type %d irq %d != subsystem irq %d\n",
+					core_array[i].core_type,
+				       core_array[i].irq,
+				       subsys[core_array[i].subsys_idx].irq);
+				pr_info("hantrodec: hw cores of a subsystem should have same irq\n");
+			}
+		} else if (core_array[i].irq != -1) {
+			subsys[core_array[i].subsys_idx].irq = core_array[i].irq;
+		}
+		subsys[core_array[i].subsys_idx].has_apbfilter[core_array[i].core_type] = 0x00;//			core_array[i].has_apb;
+		/* vcmd found */
+		if (core_array[i].core_type == HW_VCMD)
+			*vcmd = 1;
+		else if (core_array[i].core_type == HW_VCD)
+			subsys[core_array[i].subsys_idx].subsys_type = VCMD_TYPE_DECODER; /* vcd */
+	}
+
+	pr_info("hantrodec: vcmd = %d\n", *vcmd);
+
+	*subsys_num = num;
+}
+
+
 /*
  *Function name   : hantrodec_init
  *Description     : Initialize the driver
@@ -3096,7 +3172,8 @@ int hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported)
 	//"Platform driver status is %d\n", result);
 #endif
 
-	CheckSubsysCoreArray(subsys_mgr.vpu_subsys, &subsys_num, gBaseHdwr, &vcmd);//CheckSubsysCoreArray(subsys_mgr.vpu_subsys, &subsys_num, &vcmd);
+    CheckSubsysCoreArray(subsys_mgr.vpu_subsys, &subsys_num, &vcmd);
+
 	if (vcmd == 0)
 		use_vcmd = 0;
 	if (use_vcmd == 1)
@@ -3270,27 +3347,7 @@ int hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported)
 #endif
 
 	if (use_vcmd) {
-		for (i = 0; i < subsys_mgr.hantrodec_data.cores; i++) {
-			if (subsys_mgr.hantrodec_data.hwregs[i][HW_VCD])
-				vcmd_core_array[i].submodule_vcd_virtual_address =
-					subsys_mgr.hantrodec_data.hwregs[i][HW_VCD];
-			if (subsys_mgr.hantrodec_data.hwregs[i][HW_DEC400])
-				vcmd_core_array[i].submodule_dec400_virtual_address =
-					subsys_mgr.hantrodec_data.hwregs[i][HW_DEC400];
-			if (subsys_mgr.hantrodec_data.hwregs[i][HW_MMU])
-				vcmd_core_array[i].submodule_MMU_virtual_address =
-					subsys_mgr.hantrodec_data.hwregs[i][HW_MMU];
-			if (subsys_mgr.hantrodec_data.hwregs[i][HW_MMU_WR])
-				vcmd_core_array[i].submodule_MMUWrite_virtual_address =
-					subsys_mgr.hantrodec_data.hwregs[i][HW_MMU_WR];
-			if (subsys_mgr.hantrodec_data.hwregs[i][HW_AXIFE])
-				vcmd_core_array[i].submodule_axife_virtual_address =
-					subsys_mgr.hantrodec_data.hwregs[i][HW_AXIFE];
-			if (subsys_mgr.hantrodec_data.hwregs[i][HW_AXI2TO1])
-				vcmd_core_array[i].submodule_axi2to1_virtual_address =
-					subsys_mgr.hantrodec_data.hwregs[i][HW_AXI2TO1];
-		}
-		subsys_mgr.vcmd_mgr = hantrovcmd_init(subsys_mgr.vpu_subsys, subsys_num, subsys_mgr.platformdev);
+		subsys_mgr.vcmd_mgr = hantrovcmd_init(subsys_mgr.platformdev);
 		if (!subsys_mgr.vcmd_mgr)
 			goto err;
 	}

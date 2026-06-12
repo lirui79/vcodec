@@ -4,4 +4,4 @@ compile
      cd   software
      run  make      select
      example compile app
-        make hevc ENV=pci
+        make clean;make hevc ENV=pci

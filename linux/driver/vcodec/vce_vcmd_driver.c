@@ -114,6 +114,7 @@
 #include "vcmdswhwregisters.h"
 #include "bidirect_list.h"
 #include "vcx_driver.h"
+#include "vcx_mmu_priv.h"
 #include "vcx_vcmd_priv.h"
 #include "vce_abnormal_irq.h"
 #include "vce_vcmd_cfg.h"
@@ -4162,7 +4163,7 @@ int hantroenc_vcmd_init(vcx_priv_t *priv)
 	vcmd_init_free_obj_list(vcmd_mgr);
 
 	/* create vcmd kthread, which need to be woken up */
-	_vcmd_kthread_create(vcmd_mgr, "vcmd_kthread_vcx");
+	_vcmd_kthread_create(vcmd_mgr, "vcmd_kthread_vce");
 
 	/* read all registers of main-module for each dev
 	 * for analyzing configuration in cwl

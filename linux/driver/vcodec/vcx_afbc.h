@@ -61,6 +61,15 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void AFBCBypass(volatile unsigned char *hwregs);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif//__VCX_AFBC_H__

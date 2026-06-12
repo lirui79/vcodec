@@ -11,33 +11,29 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                         include vcx vcmd cfg header                          **
+**                          *.c vcm manager source code                         **
 *********************************************************************************/
 
-#ifndef _VCX_VCMD_CFG_H_
-#define _VCX_VCMD_CFG_H_
-
-
-/* submodule config */
-struct sub_mod_cfg {
-	enum subsys_module_id sub_mod_id;
-
-	unsigned int io_off; // submodule reg base (offset to vcmd reg-base)
-	unsigned int io_size;   // submodule io size
-
-	unsigned int rreg_id;  // start reg-id to read out when init driver,
-				   // 0xffff means not need to read.
-	unsigned int rreg_num;  // number of registers to read out when init driver
-};
-
-/*for all vcmds, the config info should be listed here for subsequent use*/
-struct vcmd_cfg {
-	unsigned long vcmd_base_addr;	//vcmd reg_base (bus address)
-	int vcmd_irq;
-	unsigned int sub_module_type; /*input vce=0,IM=1,vcd=2，jpege=3, jpegd=4*/
-	unsigned int priority; //the priority of vcmd
-	struct sub_mod_cfg submodule_cfg[SUB_MOD_MAX];
-};
-
-
-#endif /*_VCX_VCMD_CFG_H_*/
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/of.h>
+#include <linux/version.h>
+#include <linux/of_device.h>
+#include <linux/platform_device.h>
+#include <linux/resource.h>
+#include <linux/pm_runtime.h>
+#ifndef PCIE_EN
+/* for dma_alloc_coherent to allocate mmu &
+ * vcmd linear buffers for non-pcie env
+ */
+#if KERNEL_VERSION(5, 10, 0) > LINUX_VERSION_CODE
+#include <linux/dma-contiguous.h>
+#else
+#include <linux/dma-map-ops.h>
+#endif
+#include <linux/mod_devicetable.h>
+#include <linux/dma-buf.h>
+#endif
+#include "vcm_priv.h"
+#include "vcx_vcmd_priv.h"
