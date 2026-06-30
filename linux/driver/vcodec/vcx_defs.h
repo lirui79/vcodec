@@ -63,9 +63,6 @@
  * Macros related to dev/process workload management
  *---------------------------------------------------------------
  */
-#define VCMD_WORKLOAD_UNIT   (8192L * 4096L)
-//#define VCMD_INTR_INTERVAL   (VCMD_WORKLOAD_UNIT * 1)
-//#define PROCESS_MAX_WORKLOAD (VCMD_WORKLOAD_UNIT * 32)
 
 #ifndef MAX_SUBSYS_NUM
 #define MAX_SUBSYS_NUM     4 /* up to 4 subsystem (temporary) */

@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/resource.h>
 #include <linux/pm_runtime.h>
+#include "cmd_mgr.h"
 #include "vcx_defs.h"
 #include "vcx_priv.h"
 
@@ -246,7 +247,7 @@ static void vcx_vcodec_remove(struct platform_device *pdev)
 
     if (priv) {
         if ((priv->ops != NULL) &&  priv->ops->remove != NULL) {
-                int ret = priv->ops->remove(pdev, priv, vcmd_supported);
+                priv->ops->remove(pdev, priv, vcmd_supported);
             }
 
         dev_info(&pdev->dev, "Removing device ID: %d\n", priv->devid);
@@ -364,6 +365,18 @@ static struct platform_driver vcx_vcodec_driver = {
     },
 };
 
+vcx_priv_t*  vcx_get_private(uint32_t devid) {
+    if (devid >= DEVID_MAX)
+        return NULL;
+
+    for (int i = 0; i < DEVICE_COUNT; ++i) {
+        if (vcx_priv[i].devid == devid) {
+            return &vcx_priv[i];
+        }
+    }
+    return NULL;
+}
+
 // ------------------------------------------------------------------
 // 5. 模块初始化与退出 (手动注册 3 个平台设备)
 // ------------------------------------------------------------------
@@ -379,10 +392,13 @@ static int __init vcx_vcodec_init(void)
         "hantrodec",
     };
 
+    cmd_init_mgr();
+
     // 1. 创建类
     vcx_class = class_create(CLASS_NAME);
     if (IS_ERR(vcx_class)) {
         pr_err("Failed to create class\n");
+        cmd_exit_mgr();
         return PTR_ERR(vcx_class);
     }
 
@@ -435,15 +451,16 @@ static int __init vcx_vcodec_init(void)
         }
         priv->name = devName[priv->devid];
         platform_set_drvdata(pdev, priv);
+        priv->pdev = pdev;
         ret = platform_device_add(pdev);
         if (ret) {
             platform_device_put(pdev);
             goto err_unregister_devices;
         }
         pr_info("Registered platform device: %s.%d\n", VCX_DRIVER_NAME, i);
-        priv->pdev = pdev;
     }
 
+    cmd_start_mgr();
     return 0;
 
 err_unregister_devices:
@@ -456,6 +473,7 @@ err_chrdev:
     unregister_chrdev_region(base_dev_no, DEVICE_COUNT);
 err_class:
     class_destroy(vcx_class);
+    cmd_exit_mgr();
     return ret;
 }
 
@@ -463,8 +481,9 @@ static void __exit vcx_vcodec_exit(void)
 {
     int i;
 
+    cmd_exit_mgr();
     // 1. 注销所有平台设备 (这会触发驱动的 my_remove)
-    for (i = 0; i < DEVICE_COUNT; i++) {
+    for (i = DEVICE_COUNT - 1; i >= 0; i--) {
         if (vcx_priv[i].pdev) {
             platform_device_unregister(vcx_priv[i].pdev);
         }
@@ -478,7 +497,6 @@ static void __exit vcx_vcodec_exit(void)
 
     // 4. 销毁类
     class_destroy(vcx_class);
-
     pr_info("module exited\n");
 }
 

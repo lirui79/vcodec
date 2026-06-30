@@ -413,10 +413,6 @@ extern unsigned long gBaseDDRHw;
 unsigned int mmu_enable = MMU_FALSE;
 static unsigned int mmu_init = MMU_FALSE;
 
-#ifndef PCIE_EN
-extern struct platform_device *platformdev;
-#endif
-
 #ifdef SUPPORT_48PA_MMU
 static unsigned int mmu_page_shift[4] = {
 		MMU_PD2_SHIFT - MMU_PT_4K_SHIFT,
@@ -1685,7 +1681,7 @@ void DmaFreeMemory(struct platform_device *platformdev, unsigned int sz,
  *  va: the virtual address of free memory
  *  pa: the physical address of free memory
  */
-void MMUCleanupMemory(void)
+void MMUCleanupMemory(struct platform_device *platformdev)
 {
 #ifdef PCIE_EN
 #ifdef SUPPORT_48PA_MMU
@@ -2626,7 +2622,7 @@ enum MMUStatus MMURelease(void *filp)
 	return MMU_STATUS_OK;
 }
 
-enum MMUStatus MMUCleanup(void)
+enum MMUStatus MMUCleanup(struct platform_device *platformdev)
 {
 	int i;
 #ifdef SUPPORT_48PA_MMU
@@ -2636,7 +2632,7 @@ enum MMUStatus MMUCleanup(void)
 
 	pr_info(" *****MMU cleanup*****\n");
 
-	MMUCleanupMemory();
+	MMUCleanupMemory(platformdev);
 	DeleteMutex(g_mmu->page_table_mutex);
 
 	while (mmu_po) {
@@ -2800,7 +2796,7 @@ enum MMUStatus MMUSetup(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2])
  *	   STLB:                          0x00300000        4M bits
  *-----------------------------------------------------------------------------
  */
-enum MMUStatus MMUEnable(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2])
+enum MMUStatus MMUEnable(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2], struct platform_device *platformdev)
 {
 	enum MMUStatus status = MMU_STATUS_FALSE;
 	unsigned int mutex = MMU_FALSE;
@@ -2972,7 +2968,7 @@ enum MMUStatus MMUEnable(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2])
 	return MMU_STATUS_OK;
 
 onerror:
-	MMUCleanupMemory();
+	MMUCleanupMemory(platformdev);
 	if (mutex)
 		ReleaseMutex(g_mmu->page_table_mutex);
 	MMUDEBUG(" *****MMU Enable Error*****\n");

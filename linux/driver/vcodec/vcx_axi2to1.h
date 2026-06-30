@@ -84,8 +84,6 @@ int AXI2TO1_init(volatile u8 *hwregs);
 int AXI2TO1_flush(volatile u8 *hwregs);
 
 #ifdef AXI2TO1_SUPPORT
-void process_axi2to1_abn_irq(void *mgr, void *pdev);
-
 extern struct sub_ip_init_cfg axi2to1_init_cfg[];
 #endif
 

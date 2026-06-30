@@ -177,31 +177,3 @@ int AXI2TO1_init(volatile u8 *hwregs)
 
 	return 0;
 }
-
-
-#ifdef AXI2TO1_SUPPORT
-/**
- * @brief process axi2to1 abnormal irq
- */void process_axi2to1_abn_irq(void *mgr, void *pdev) {
-	vcmd_mgr_t *vcmd_mgr = (vcmd_mgr_t *)mgr;
-	struct hantrovcmd_dev *dev = (struct hantrovcmd_dev *) pdev;
-	struct vcmd_subsys_info *subsys = dev->subsys_info;
-
-	volatile void *hwregs;
-	unsigned long flags;
-	u32 irq;
-
-	hwregs = subsys->hwregs[SUB_MOD_AXI2TO1];
-
-	irq = (u32)ioread32((void __iomem *)(hwregs + AXI2TO1_REG5_SW_IRQ)); //axi2to irq status
-	/* bit0: flush done and bit1: flush timeout will be triggerd by flush operation */
-	if (irq & 0xFFFFFFFC) {
-		spin_lock_irqsave(&dev->abn_irq_lock, flags);
-		/* clear axi2to1 irq */
-		iowrite32(irq, (void __iomem *)(hwregs + AXI2TO1_REG5_SW_IRQ));
-		dev->kthread_actions |= KT_ACT_AXI2TO1_EXCEPTION;
-		spin_unlock_irqrestore(&dev->abn_irq_lock, flags);
-		_vcmd_kthread_wakeup(vcmd_mgr);
-	}
-}
-#endif

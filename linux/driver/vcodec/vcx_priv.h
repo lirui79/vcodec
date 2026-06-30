@@ -36,6 +36,7 @@ enum DEVID {
     DEVID_VCX = 0,
     DEVID_VCE = 1,
     DEVID_VCD = 2,
+    DEVID_MAX = 3,
 };
 
 typedef struct {
@@ -112,6 +113,8 @@ void vcd_init_ops(vcx_priv_t *priv);
 int  vcx_create_devnode(vcx_priv_t *priv, const struct file_operations *ops);
 
 void _dbg_log_instr(u32 offset, u32 instr, u32 *size, char *str);
+
+vcx_priv_t*  vcx_get_private(uint32_t devid);
 
 #ifdef __cplusplus
 }

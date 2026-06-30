@@ -11,29 +11,25 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                          *.c vcm manager source code                         **
+**                        include vcx vcmd headers                              **
 *********************************************************************************/
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/of.h>
-#include <linux/version.h>
-#include <linux/of_device.h>
-#include <linux/platform_device.h>
-#include <linux/resource.h>
-#include <linux/pm_runtime.h>
-#ifndef PCIE_EN
-/* for dma_alloc_coherent to allocate mmu &
- * vcmd linear buffers for non-pcie env
- */
-#if KERNEL_VERSION(5, 10, 0) > LINUX_VERSION_CODE
-#include <linux/dma-contiguous.h>
-#else
-#include <linux/dma-map-ops.h>
+#ifndef _VCX_VCMD_H_
+#define _VCX_VCMD_H_
+
+//#include "vcx_vcmd_priv.h"
+
+#ifdef __cplusplus
+extern "C" {
 #endif
-#include <linux/mod_devicetable.h>
-#include <linux/dma-buf.h>
+
+void vce_proc_add_done_job(vcmd_mgr_t *vcmd_mgr, struct cmdbuf_obj *obj);
+
+void vcd_proc_add_done_job(vcmd_mgr_t *vcmd_mgr, struct cmdbuf_obj *obj);
+
+#ifdef __cplusplus
+}
 #endif
-#include "vcm_priv.h"
-#include "vcx_vcmd_priv.h"
+
+#endif //_VCX_VCMD_H_
+

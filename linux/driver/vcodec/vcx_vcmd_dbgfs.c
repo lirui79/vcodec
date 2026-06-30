@@ -92,6 +92,7 @@
 #define DBGFS_PERFORMANCE_FILE "performance"
 #define DBGFS_REGPRINT_FILE    "regprint"
 
+#ifdef SUPPORT_DBGFS
 
 #define _GET_DBGFS_CTX(dev_dbgfs)                                 \
 	((struct dbgfs_priv *)((vcmd_mgr_t *)dev_dbgfs->vcmd_mgr)->dbgfs_ctx)
@@ -893,3 +894,5 @@ void _dbgfs_update_index(void *_dev_dbgfs)
 		(dev_dbgfs->interrupt_index + 1) % MAX_RESERVED_TIME;
 	dev_dbgfs->cycle_index = (dev_dbgfs->cycle_index + 1) % MAX_RESERVED_TIME;
 }
+
+#endif

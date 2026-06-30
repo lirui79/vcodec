@@ -35,8 +35,9 @@
 #include <linux/mod_devicetable.h>
 #include <linux/dma-buf.h>
 #endif
-#include "vcd_priv.h"
 
+#include "cmd_mgr.h"
+#include "vcd_priv.h"
 #include "vcx_vcmd_priv.h"
 
 
@@ -45,13 +46,13 @@ static int vcd_priv_probe(struct platform_device *pdev, void *priv, int vcmd_sup
 	int ret = 0;
 
 	pr_info("hantrodec: %s called\n", __func__);
-	ret = hantrodec_normal_init((vcx_priv_t *)priv, vcmd_supperted);
-/*
+//	ret = hantrodec_normal_init((vcx_priv_t *)priv, vcmd_supperted);
+
 	if (vcmd_supported == 0)
-		ret = hantrodec_normal_init((vcx_priv_t *)priv);
+		ret = hantrodec_normal_init((vcx_priv_t *)priv, vcmd_supperted);
 	else
 		ret = hantrodec_vcmd_init((vcx_priv_t *)priv);
-*/
+
 	if (ret < 0)
 		return ret;
 #ifdef CONFIG_DEC_PM
@@ -60,13 +61,13 @@ static int vcd_priv_probe(struct platform_device *pdev, void *priv, int vcmd_sup
 	return 0;
 }
 static int vcd_priv_remove(struct platform_device *pdev, void *priv, int vcmd_supperted) {
-	hantrodec_normal_cleanup((vcx_priv_t *)priv);
-/*
+//	hantrodec_normal_cleanup((vcx_priv_t *)priv);
+
 	if (vcmd_supported == 0)
 		hantrodec_normal_cleanup((vcx_priv_t *)priv);
 	else
 		hantrodec_vcmd_cleanup((vcx_priv_t *)priv);
-*/
+
 #ifdef CONFIG_DEC_PM
 	pm_runtime_disable(&pdev->dev);
 #endif
@@ -77,13 +78,13 @@ static int vcd_priv_remove(struct platform_device *pdev, void *priv, int vcmd_su
 static int vcd_priv_suspend(struct device *dev, void *priv, int vcmd_supperted) {
 	vcx_priv_t *vcx_priv = (vcx_priv_t*) priv;
 	int ret = 0;
-	ret = hantrodec_pm_suspend(priv);
-/*
+//	ret = hantrodec_pm_suspend(priv);
+
 	if (vcmd_supported == 1)
-		ret = vcmd_pm_suspend(vcx_priv->priv);
+		ret = vcmddec_pm_suspend(vcx_priv->priv);
 	else
-		ret = enc_pm_suspend(vcx_priv->priv);
-*/
+		ret = hantrodec_pm_suspend(vcx_priv->priv);
+
 	pr_info("%s: device suspend done!\n", __func__);
 	return ret;
 }
@@ -91,13 +92,13 @@ static int vcd_priv_suspend(struct device *dev, void *priv, int vcmd_supperted) 
 static int vcd_priv_resume(struct device *dev, void *priv, int vcmd_supperted) {
 	vcx_priv_t *vcx_priv = (vcx_priv_t*) priv;
 	int ret = 0;
-	ret = hantrodec_pm_resume(priv);
-/*
+//	ret = hantrodec_pm_resume(priv);
+
 	if (vcmd_supported == 1)
-		ret = vcmd_pm_resume(vcx_priv->priv);
+		ret = vcmddec_pm_resume(vcx_priv->priv);
 	else
-		ret = enc_pm_resume(vcx_priv->priv);
-*/
+		ret = hantrodec_pm_resume(vcx_priv->priv);
+
 	pr_info("%s, device resume done!\n", __func__);
 	return ret;
 }

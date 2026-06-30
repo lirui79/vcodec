@@ -157,10 +157,6 @@ static struct wait_list_node wait_node_pool[MAX_WAIT_NODE_NUM];
 #ifdef SUPPORT_MMU
 extern unsigned int mmu_enable;
 #endif
-extern struct platform_device *platformdev;
-//#ifdef PCIE_EN
-//unsigned long gBaseDDRHw;/* PCI base register address (memalloc) */
-//#endif
 
 
 typedef struct {
@@ -200,6 +196,7 @@ typedef struct {
 } hantroenc_t;
 
 static struct subsys_manager {
+	struct platform_device *platformdev;
 	int total_subsys_num;
 	unsigned int mmu_enable;
 	volatile u8 *mmu_hwregs[HXDEC_MAX_CORES][2];
@@ -1756,6 +1753,7 @@ int hantroenc_normal_init(vcx_priv_t *priv)
 	int i, j, array_sz;
 	hantroenc_t *hantroenc_data = NULL;
 	struct subsys_manager *owner = &subsys_mgr;			//TODO
+	owner->platformdev = priv->pdev;
 
 #ifdef DTB_SUPPORT
 	result = get_of_property();
@@ -1866,7 +1864,7 @@ int hantroenc_normal_init(vcx_priv_t *priv)
 					   hantroenc_data[i].subsys_data.core_info.offset[CORE_MMU_1];
 	}
 
-	mmu_status = MMUEnable(owner->mmu_hwregs);
+	mmu_status = MMUEnable(owner->mmu_hwregs, owner->platformdev);
 	owner->mmu_enable = mmu_enable;
 	PDEBUG("mmu_enable is %d\n", mmu_enable);
 	if (mmu_status != MMU_STATUS_OK) {
@@ -1959,7 +1957,7 @@ void hantroenc_normal_cleanup(vcx_priv_t *priv)
 	}
 
 #ifdef SUPPORT_MMU
-	MMUCleanup();
+	MMUCleanup(owner->platformdev);
 #endif
 
 	ReleaseIO(owner);
@@ -1969,8 +1967,6 @@ void hantroenc_normal_cleanup(vcx_priv_t *priv)
 	if (owner->gDev)
 		pci_disable_device(owner->gDev);
 #endif
-
-	//unregister_chrdev(owner->hantroenc_major, enc_dev_n);
 
 	pr_info("hantroenc: module removed\n");
 }

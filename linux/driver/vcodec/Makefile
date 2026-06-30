@@ -97,66 +97,8 @@ ifeq ($(EMU),y)
   EXTRA_CFLAGS += -DEMU
 endif
 
-ifeq ($(obj),)
-obj = .
-endif
-
-#################################################
-# configuration
-
-MDIR		:= hantro
-
-# drivers objects
-# list-multi	:= hantro_mmu.o
-
-# # what to build
-
-$(vcodec_dev)-objs 	:=  vcx_driver.o vcmdswhwregisters.o bidirect_list.o vcm_driver.o vcx_kthread.o
-$(vcodec_dev)-objs  +=  vce_driver.o vce_vcmd_driver.o vce_normal_driver.o vce_abnormal_irq.o
-$(vcodec_dev)-objs  +=  vcd_driver.o vcd_vcmd_driver.o vcd_normal_driver.o vcd_abnormal_irq.o
-$(vcodec_dev)-objs  +=  vcm_driver.o vcm_priv.o
-
-obj-m         += $(vcodec_dev).o
-
-ifeq ($(strip $(SUPPORT_MMU)),y)
-$(vcodec_dev)-objs += vcx_mmu.o
-endif
-
-ifeq ($(strip $(SUPPORT_AXIFE)),y)
-$(vcodec_dev)-objs += vcx_axife.o
-endif
-
-ifeq ($(strip $(SUPPORT_AXI2TO1)),y)
-$(vcodec_dev)-objs += vcx_axi2to1.o
-endif
-
-ifeq ($(strip $(SUPPORT_AFBC)),y)
-$(vcodec_dev)-objs += vcx_afbc.o
-endif
-
-ifeq ($(SUPPORT_DEBUGFS),y)
-  $(vcodec_dev)-objs += vcx_vcmd_dbgfs.o
-endif
-
-tardest		:= .
-
-#################################################
-# compile modules
-
-ifneq ($(KERNELRELEASE),)
-# recursive call from kernel build system
-dummy		:= $(shell echo $(KERNELRELEASE) > $(obj)/.version)
-
-ifeq ($(VERSION).$(PATCHLEVEL),2.6)
- export-objs	:=
- list-multi	:=
-else
- multi-m	:= $(filter $(list-multi), $(obj-m))
- int-m		:= $(sort $(foreach m, $(multi-m), $($(basename $(m))-objs)))
- export-objs	:= $(filter $(int-m) $(obj-m),$(export-objs))
-endif
-
-CC += -I$(obj)
+#CC += -I$(obj) -I$(obj)/mailbox
+ccflags-y += -I$(src) -I$(src)/mailbox
 EXTRA_CFLAGS += -g
 
 # Print debugging messages from the device
@@ -236,6 +178,69 @@ ifeq ($(SUPPORT_PM),y)
   EXTRA_CFLAGS += -DCONFIG_ENC_PM
 endif
  EXTRA_CFLAGS += -DCONFIG_ENC_PM -DCONFIG_DEC_PM
+
+ifeq ($(obj),)
+obj = .
+endif
+
+#################################################
+# configuration
+
+MDIR		:= hantro
+
+# drivers objects
+# list-multi	:= hantro_mmu.o
+
+# # what to build
+
+$(vcodec_dev)-objs 	:=  vcx_driver.o vcmdswhwregisters.o bidirect_list.o vcm_driver.o vcx_kthread.o
+$(vcodec_dev)-objs  +=  vce_driver.o vce_vcmd_driver.o vce_normal_driver.o
+$(vcodec_dev)-objs  +=  vcd_driver.o vcd_vcmd_driver.o vcd_normal_driver.o
+$(vcodec_dev)-objs  +=  vcm_driver.o mhu_v3_client.o
+
+$(vcodec_dev)-objs  +=  mailbox/cqueue.o mailbox/bqueue.o mailbox/cmd_session.o mailbox/cmd_mgr.o mailbox/cmd_msg.o mailbox/cmd.o mailbox/cmdnode.o
+
+obj-m         += $(vcodec_dev).o
+
+
+ifeq ($(strip $(SUPPORT_MMU)),y)
+$(vcodec_dev)-objs += vcx_mmu.o
+endif
+
+ifeq ($(strip $(SUPPORT_AXIFE)),y)
+$(vcodec_dev)-objs += vcx_axife.o
+endif
+
+ifeq ($(strip $(SUPPORT_AXI2TO1)),y)
+$(vcodec_dev)-objs += vcx_axi2to1.o
+endif
+
+ifeq ($(strip $(SUPPORT_AFBC)),y)
+$(vcodec_dev)-objs += vcx_afbc.o
+endif
+
+ifeq ($(SUPPORT_DEBUGFS),y)
+  $(vcodec_dev)-objs += vcx_vcmd_dbgfs.o
+endif
+
+tardest		:= .
+
+#################################################
+# compile modules
+
+ifneq ($(KERNELRELEASE),)
+# recursive call from kernel build system
+dummy		:= $(shell echo $(KERNELRELEASE) > $(obj)/.version)
+
+ifeq ($(VERSION).$(PATCHLEVEL),2.6)
+ export-objs	:=
+ list-multi	:=
+else
+ multi-m	:= $(filter $(list-multi), $(obj-m))
+ int-m		:= $(sort $(foreach m, $(multi-m), $($(basename $(m))-objs)))
+ export-objs	:= $(filter $(int-m) $(obj-m),$(export-objs))
+endif
+
 -include $(TOPDIR)/Rules.make
 else
 # take version info from last module build if available

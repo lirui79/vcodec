@@ -11,55 +11,35 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                      include vcd private headers                             **
+**                                 include cmd header                           **
 *********************************************************************************/
 
-#ifndef _VCD_PRIVATE_H_
-#define _VCD_PRIVATE_H_
+#ifndef _MAILBOX_COMMAND_H_
+#define _MAILBOX_COMMAND_H_
 
-#include "vcx_priv.h"
-
+#include "cmdef.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+void    cmd_init(cmdMsg_t *cmdMsg);
 
-int   hantrodec_vcmd_init(vcx_priv_t *priv);
+int32_t cmd_recv(uint32_t r52ID);
 
-void  hantrodec_vcmd_cleanup(vcx_priv_t *priv);
+int32_t cmd_send(cmdMsg_t *cmdMsg);
 
-int   hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported);
+//int32_t cmd_proc(void);
 
-void  hantrodec_normal_cleanup(vcx_priv_t *priv);
+uint32_t crc32_calc(const uint8_t *buffer, size_t bufferLength);
 
-int   abort_vcd(volatile u8 *reg_base);
+int32_t  cmd_recv_thread_create(void* arg);
 
-void vcd_vcmd_watchdog_process(void *handler);
+int32_t  cmd_recv_thread_stop(void* arg);
 
-void vcd_vcmd_bus_err_process(void *handler);
-
-#ifdef AXI2TO1_SUPPORT
-int vcd_process_subsystem_exceptions(void *handler);
-#endif
-
-#ifdef CONFIG_DEC_PM
-
-int   hantrodec_pm_suspend(void *handler);
-
-int   hantrodec_pm_resume(void *handler);
-
-int   vcmddec_pm_suspend(void *handler);
-
-int   vcmddec_pm_resume(void *handler);
-
-#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //_VCD_PRIVATE_H_
-
-
-
+#endif /*_MAILBOX_COMMAND_H_*/

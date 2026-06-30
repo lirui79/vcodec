@@ -25,15 +25,10 @@ extern "C" {
 #endif
 
 
-
-int hantrovcmd_open(struct inode *inode, struct file *filp);
-int hantrovcmd_release(struct inode *inode, struct file *filp);
-long hantrovcmd_ioctl(struct file *filp,
-				  unsigned int cmd, unsigned long arg);
-void *hantrovcmd_init(void *platformdev);
-//void hantrovcmd_cleanup(void *_vcmd_mgr);
+#ifdef VCARB_REQUEST
 void vcmd_request_arbiter(void *_vcmd_mgr, u32 subsys_id);
 void vcmd_release_arbiter(void *_vcmd_mgr, u32 subsys_id);
+#endif//VCARB_REQUEST
 //int vcmd_pm_suspend(void *_vcmd_mgr);
 //int vcmd_pm_resume(void *_vcmd_mgr);
 u32 *get_submodule_regs_va(void *_vcmd_mgr, u32 subsys_id, u32 sub_mod_id);

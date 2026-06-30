@@ -11,55 +11,46 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                      include vcd private headers                             **
+**                           include c queue header                             **
 *********************************************************************************/
 
-#ifndef _VCD_PRIVATE_H_
-#define _VCD_PRIVATE_H_
+#ifndef _C_QUEUE_H_
+#define _C_QUEUE_H_
 
-#include "vcx_priv.h"
-
+#include "cmd_inc.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-int   hantrodec_vcmd_init(vcx_priv_t *priv);
+typedef void*  CQueueHandle_t;
 
-void  hantrodec_vcmd_cleanup(vcx_priv_t *priv);
+CQueueHandle_t CQueueCreate(uint32_t qSize, uint32_t iSize);
 
-int   hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported);
+void           CQueueDelete(CQueueHandle_t handle);
 
-void  hantrodec_normal_cleanup(vcx_priv_t *priv);
+uint32_t       CQueueCapacity(CQueueHandle_t handle);
 
-int   abort_vcd(volatile u8 *reg_base);
+uint32_t       CQueueLength(CQueueHandle_t handle);
 
-void vcd_vcmd_watchdog_process(void *handler);
+uint32_t       CQueueItemSize(CQueueHandle_t handle);
 
-void vcd_vcmd_bus_err_process(void *handler);
+int32_t        CQueueEnqueue(CQueueHandle_t handle, void* item);
 
-#ifdef AXI2TO1_SUPPORT
-int vcd_process_subsystem_exceptions(void *handler);
-#endif
+void*          CQueueDequeue(CQueueHandle_t handle);
 
-#ifdef CONFIG_DEC_PM
+void*          CQueuePeek(CQueueHandle_t handle);
 
-int   hantrodec_pm_suspend(void *handler);
+int32_t        CQueueEnqueueFromISR(CQueueHandle_t handle, void* item);
 
-int   hantrodec_pm_resume(void *handler);
+void*          CQueueDequeueFromISR(CQueueHandle_t handle);
 
-int   vcmddec_pm_suspend(void *handler);
+void*          CQueuePeekFromISR(CQueueHandle_t handle);
 
-int   vcmddec_pm_resume(void *handler);
-
-#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //_VCD_PRIVATE_H_
-
-
-
+#endif /*_C_QUEUE_H_*/

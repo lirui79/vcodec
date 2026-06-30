@@ -77,8 +77,11 @@
 #include <linux/mod_devicetable.h>
 #include <linux/dma-buf.h>
 #endif
+
+#include "cmd_mgr.h"
 #include "vce_priv.h"
 #include "vcx_vcmd_priv.h"
+#include "vcx_vcmd.h"
 
 
 
@@ -97,6 +100,7 @@ static int vce_priv_probe(struct platform_device *pdev, void *priv, int vcmd_sup
 #ifdef CONFIG_ENC_PM
 	pm_runtime_enable(&pdev->dev);
 #endif
+
 	return 0;
 }
 static int vce_priv_remove(struct platform_device *pdev, void *priv, int vcmd_supperted) {

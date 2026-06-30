@@ -25,65 +25,6 @@
 /********************************************************************
  * watchdog and kthread functions
  ********************************************************************/
-static void _vcmd_watchdog_process(struct hantrovcmd_dev *dev)
-{
-	struct vcmd_subsys_info *subsys = dev->subsys_info;
-	if (subsys->sub_module_type == VCMD_TYPE_ENCODER) {
-		vce_vcmd_watchdog_process(dev);
-	}
-	if (subsys->sub_module_type == VCMD_TYPE_DECODER) {
-		vcd_vcmd_watchdog_process(dev);
-	}
-}
-
-/**
- * @brief sw process flow for v1.6.x bus err.
- */
-static void _vcmd_bus_err_process(struct hantrovcmd_dev *dev)
-{
-	struct vcmd_subsys_info *subsys = dev->subsys_info;
-	if (subsys->sub_module_type == VCMD_TYPE_ENCODER) {
-		vce_vcmd_bus_err_process(dev);
-	}
-	if (subsys->sub_module_type == VCMD_TYPE_DECODER) {
-		vcd_vcmd_bus_err_process(dev);
-	}
-}
-
-#ifdef AXI2TO1_SUPPORT
-/**
- * @brief process subsystem exceptions
- */
-static int process_subsystem_exceptions(struct hantrovcmd_dev *dev)
-{
-	struct vcmd_subsys_info *subsys = dev->subsys_info;
-	if (subsys->sub_module_type == VCMD_TYPE_ENCODER) {
-		return vce_process_subsystem_exceptions(dev);
-	}
-	if (subsys->sub_module_type == VCMD_TYPE_DECODER) {
-		return vcd_process_subsystem_exceptions(dev);
-	}
-	return 0;
-}
-
-#endif
-
-/**
- * @brief process external vcmd timeout.
- */
-static void hook_vcmd_external_timeout(void *_dev)
-{
-	unsigned long flags;
-	struct hantrovcmd_dev *dev = (struct hantrovcmd_dev *)_dev;
-
-	spin_lock_irqsave(dev->spinlock, flags);
-	dev->state = VCMD_STATE_IDLE;
-	spin_unlock_irqrestore(dev->spinlock, flags);
-
-	vcmd_klog(LOGLVL_ERROR, "vcmd abort is not waited, the timeout is from external system!\n");
-
-	//need to do sub-system reset
-}
 
 /**
  * @brief To check vcmd_mgr/dev's actions which need kthread to process
@@ -129,30 +70,14 @@ static int _vcmd_kthread_fn(void *data)
 		if (dev->kthread_actions & KT_ACT_HW_TIMEOUT) {
 			dev->kthread_actions = 0;
 			/* if external timeout, will do system reset */
-			hook_vcmd_external_timeout(dev);
+			//hook_vcmd_external_timeout(dev);
 			continue;
 		}
 		if (dev->kthread_actions & KT_ACT_HW_BUS_ERR) {
 			dev->kthread_actions = 0;
-			_vcmd_bus_err_process(dev);
+			//_vcmd_bus_err_process(dev);
 			continue;
 		}
-#ifdef AXI2TO1_SUPPORT
-		if (dev->kthread_actions &
-				(KT_ACT_CMDBUF_TIMEOUT | KT_ACT_AXI2TO1_EXCEPTION)) {
-			dev->kthread_actions = 0;
-			/* if has exceptions, will reset subsystem */
-			process_subsystem_exceptions(dev);
-			continue;
-		}
-#endif
-#ifdef SUPPORT_WATCHDOG
-		if (dev->kthread_actions & KT_ACT_WATCHDOG) {
-			dev->kthread_actions = 0;
-			_vcmd_watchdog_process(dev);
-			continue;
-		}
-#endif
 	}
 
 	return 0;

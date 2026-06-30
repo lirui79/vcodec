@@ -11,55 +11,55 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                      include vcd private headers                             **
+**                      include command session header                          **
 *********************************************************************************/
 
-#ifndef _VCD_PRIVATE_H_
-#define _VCD_PRIVATE_H_
+#ifndef _COMMAND_SESSION_H_
+#define _COMMAND_SESSION_H_
 
-#include "vcx_priv.h"
-
+#include "cmdef.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define CMD_SESSION_MAX  32
 
-int   hantrodec_vcmd_init(vcx_priv_t *priv);
+typedef enum {
+    CMD_SESSION_STATUS_IDLE = 0,
+    CMD_SESSION_STATUS_RUN,
+    CMD_SESSION_STATUS_EXIT,
+    CMD_SESSION_STATUS_STOP
+} cmd_session_status;
 
-void  hantrodec_vcmd_cleanup(vcx_priv_t *priv);
+struct proc_obj;
 
-int   hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported);
+//session
+struct cmd_session{
+    uint32_t               sessionID;// r52id + session_idx
+    uint32_t               seqRNum;// sequence number, from 0 to 0xFFFFFFFF
+    uint32_t               seqSNum;// sequence number, from 0 to 0xFFFFFFFF
+    uint32_t               status;
+    struct proc_obj       *proc;
+    struct rb_root         cmdroot;
+	spinlock_t             spinlock;
+};
 
-void  hantrodec_normal_cleanup(vcx_priv_t *priv);
+typedef struct cmd_session cmd_session_t;
 
-int   abort_vcd(volatile u8 *reg_base);
+int32_t        cmd_session_init(cmd_session_t *session, struct proc_obj *proc, uint32_t sessionID);
 
-void vcd_vcmd_watchdog_process(void *handler);
+int32_t        cmd_session_check(cmd_session_t *session, cmdMsg_t *cmdMsg);
 
-void vcd_vcmd_bus_err_process(void *handler);
+int32_t        cmd_session_system(cmd_session_t *session, cmdMsg_t *cmdMsg);
 
-#ifdef AXI2TO1_SUPPORT
-int vcd_process_subsystem_exceptions(void *handler);
-#endif
+int32_t        cmd_session_vcodec(cmd_session_t *session, cmdMsg_t *cmdMsg);
 
-#ifdef CONFIG_DEC_PM
+int32_t        cmd_session_send(cmd_session_t *session, cmdMsg_t *cmdMsg);
 
-int   hantrodec_pm_suspend(void *handler);
-
-int   hantrodec_pm_resume(void *handler);
-
-int   vcmddec_pm_suspend(void *handler);
-
-int   vcmddec_pm_resume(void *handler);
-
-#endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //_VCD_PRIVATE_H_
-
-
-
+#endif /*_COMMAND_SESSION_H_*/

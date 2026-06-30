@@ -243,43 +243,6 @@ struct hantrodec_dev {
 	struct device *dev;
 	void *priv_data;
 };
-/* for match platform driver.
- */
-static const struct platform_device_info hantro_platform_info = {
-	.name = DRIVER_NAME,
-	.id = -1,
-#ifndef PCIE_EN
-	.dma_mask = DMA_BIT_MASK(32),
-#endif
-};
-
-/* struct used for matching a device */
-static const struct of_device_id of_hantrodec_match[] = {
-	{
-		.compatible = "vsi, vcd", // used for matching device and driver
-	},
-	{ /* sentinel */ }
-};
-
-MODULE_DEVICE_TABLE(of, of_hantrodec_match);
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
-static void hantrodec_remove(struct platform_device *dev)
-{
-	/*TODO*/
-	//pr_info("%s: removed driver!\n", __func__);
-	return;
-}    // 使用新内核的 API
-#else
-static int hantrodec_remove(struct platform_device *dev)
-{
-	/*TODO*/
-	//pr_info("%s: removed driver!\n", __func__);
-	return 0;
-}
-#endif
-
-/* here's all the must remember stuff */
 
 /* a watchdog which belongs to each device */
 typedef struct {
@@ -431,61 +394,7 @@ int abort_vcd(volatile u8 *reg_base)
 	return 0;
 }
 
-#ifdef SUPPORT_WATCHDOG
-/**
- * @brief hook function for system-driver to do further process
- *  for tiggered watchdog.
- */
-static void hook_watchdog(void *_dev, int succeed)
-{
-	if (succeed)
-		pr_err("hantrodec: flush succeed!!");
-	else
-		pr_err("hantrodec: flush failed, need to re-power sub-system");
-}
 
-/**
- * @brief stop vcd when watchdog triggered
- */
-int watchdog_stop_vcd(volatile u8 *reg_base)
-{
-	u32 status;
-
-	if (abort_vcd(reg_base)) {
-		mdelay(10); //delay 10ms
-		status = (u32)ioread32((void __iomem *)(reg_base + HANTRODEC_IRQ_STAT_DEC_OFF));
-		//Stop VCD by setting reg1 bit0 to 0.
-		if ((status & 0x1) == 0)
-			iowrite32(0, (void __iomem *)(reg_base + HANTRODEC_IRQ_STAT_DEC_OFF));
-	}
-
-	return 0;
-}
-
-/**
- * @brief process when watchdog triggered.
- */
-static void watchdog_process(watchdog_t *watchdog)
-{
-	hantrodec_t *dev = &subsys_mgr.hantrodec_data;
-	u32 core_id = watchdog->core_id;
-	int succeed = 1;
-	unsigned long flags;
-
-	if (core_id >= subsys_mgr.hantrodec_data.cores)
-		return;
-	spin_lock_irqsave(&subsys_mgr.owner_lock, flags);
-	watchdog_stop_vcd(dev->hwregs[core_id][HW_VCD]);
-#ifdef SUPPORT_AXIFE
-	if (AXIFEFlush(dev->hwregs[core_id][HW_AXIFE]) == -1)
-		succeed = 0;
-#else
-	succeed = 0;
-#endif
-	hook_watchdog(dev, succeed);
-	spin_unlock_irqrestore(&subsys_mgr.owner_lock, flags);
-}
-#endif //SUPPORT_WATCHDOG
 
 /**
  * @brief To check subsys_mgr/dev's actions which need kthread to process
@@ -529,13 +438,6 @@ static int _kthread_fn(void *data)
 		if (watchdog == NULL)
 			continue;
 
-#ifdef SUPPORT_WATCHDOG
-		if (watchdog->triggered == 1) {
-			watchdog->triggered = 0;
-			watchdog_process(watchdog);
-			continue;
-		}
-#endif
 	}
 
 	return 0;
@@ -671,8 +573,7 @@ static long DecStoreRegs(hantrodec_t *dev, u32 id)
 	return 0;
 }
 
-int dec_pm_suspend(void *handler)
-{
+static int dec_pm_suspend(void *handler) {
 	u32 i;
 	hantrodec_t *dev = (hantrodec_t *)handler;
 
@@ -690,8 +591,7 @@ int dec_pm_suspend(void *handler)
 	return 0;
 }
 
-int dec_pm_resume(void *handler)
-{
+static int dec_pm_resume(void *handler) {
 	int i;
 	hantrodec_t *dev = (hantrodec_t *)handler;
 
@@ -705,22 +605,30 @@ int dec_pm_resume(void *handler)
 	return 0;
 }
 
-int hantrodec_pm_suspend(void *handler)
-{
+int hantrodec_pm_suspend(void *handler) {
+	struct SubsysMgr *owner = (struct SubsysMgr *) handler;
+	int ret = 0;
+	ret = dec_pm_suspend(&owner->hantrodec_data);
+/*
 	vcx_priv_t *vcx_priv = (vcx_priv_t*) handler;
     struct SubsysMgr *owner = (struct SubsysMgr *) vcx_priv->priv;
 	int ret = 0;
-
 	if (use_vcmd)
 		ret = vcmddec_pm_suspend(owner->vcmd_mgr);
 	else
 		ret = dec_pm_suspend(&owner->hantrodec_data);
+*/
 	pr_info("%s: device suspend done!\n", __func__);
 	return ret;
 }
 
 int hantrodec_pm_resume(void *handler)
 {
+	struct SubsysMgr *owner = (struct SubsysMgr *) handler;
+	int ret = 0;
+
+	ret = dec_pm_resume(&owner->hantrodec_data);
+/*
 	vcx_priv_t *vcx_priv = (vcx_priv_t*) handler;
     struct SubsysMgr *owner = (struct SubsysMgr *) vcx_priv->priv;
 	int ret = 0;
@@ -728,7 +636,7 @@ int hantrodec_pm_resume(void *handler)
 	if (use_vcmd)
 		ret = vcmddec_pm_resume(owner->vcmd_mgr);
 	else
-		ret = dec_pm_resume(&owner->hantrodec_data);
+		ret = dec_pm_resume(&owner->hantrodec_data);*/
 	pr_info("%s, device resume done!\n", __func__);
 	return ret;
 }
@@ -2684,7 +2592,7 @@ static long hantrodec_ioctl(struct file *filp, unsigned int cmd,
 		}
 #endif
 		if (_IOC_TYPE(cmd) == HANTRO_VCMD_IOC_MAGIC)
-			return hantrovcmd_ioctl(filp, cmd, arg);
+			//return hantrovcmd_ioctl(filp, cmd, arg);
 
 		return -ENOTTY;
 	}
@@ -2755,20 +2663,6 @@ static int get_of_property(void)
 static int hantrodec_open(struct inode *inode, struct file *filp)
 {
 	PDEBUG("dev opened\n");
-	if (use_vcmd) {
-		struct vcmd_priv_ctx *vcmd_priv_ctx = NULL;
-
-		vcmd_priv_ctx = vmalloc(sizeof(struct vcmd_priv_ctx));
-		if (!vcmd_priv_ctx) {
-			PDEBUG("Create vcmd private context failed!\n");
-			return -EINVAL;
-		}
-		memset(vcmd_priv_ctx, 0, sizeof(struct vcmd_priv_ctx));
-
-		filp->private_data = (void *)vcmd_priv_ctx;
-		vcmd_priv_ctx->vcmd_mgr = (void *)subsys_mgr.vcmd_mgr;
-		hantrovcmd_open(inode, filp);
-	}
 	#ifdef SUPPORT_DBGFS
 	if (!use_vcmd) {
 		int i, j;
@@ -2827,16 +2721,6 @@ static int hantrodec_release(struct inode *inode,
 
 	PDEBUG("closing ...\n");
 
-
-	if (use_vcmd) {
-		hantrovcmd_release(inode, filp);
-#ifdef SUPPORT_MMU
-		if (subsys_mgr.hantrodec_data.hwregs[0][HW_MMU])
-			MMURelease(filp);
-#endif
-		return 0;
-	}
-
 	for (n = 0; n < dev->cores; n++) {
 		if (subsys_mgr.core_owner[n].filp == filp) {
 			PDEBUG("releasing dec core %i lock\n", n);
@@ -2882,11 +2766,12 @@ static const struct file_operations hantrodec_fops = {
 	.mmap = hantrodec_mmap,
 	.release = hantrodec_release,
 	.unlocked_ioctl = hantrodec_ioctl,
-	.fasync = NULL };
+	.fasync = NULL,
+};
 
 static const struct vm_operations_struct hantrodec_vm_ops = {
 #ifdef CONFIG_HAVE_IOREMAP_PROT
-	.access = generic_access_phys
+	.access = generic_access_phys,
 #endif
 };
 
@@ -3135,6 +3020,7 @@ int hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported)
 	int result = 0, i;
 	int subsys_num;
 	struct SubsysMgr *owner = &subsys_mgr;
+	owner->platformdev = priv->pdev;
 	use_vcmd = vcmd_supported;
 
 	PDEBUG("module init\n");
@@ -3314,7 +3200,7 @@ int hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported)
 			mmu_hwregs[i][0] = subsys_mgr.hantrodec_data.hwregs[i][HW_MMU];
 			mmu_hwregs[i][1] = subsys_mgr.hantrodec_data.hwregs[i][HW_MMU_WR];
 		}
-       MMUEnable(mmu_hwregs);//MMUEnable(mmu_hwregs, subsys_mgr.platformdev);
+       MMUEnable(mmu_hwregs, subsys_mgr.platformdev);
 	}
 #endif
 
@@ -3345,12 +3231,12 @@ int hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported)
 		debugfs_create_file("regprint", 0444, debug_root, NULL, &fileop_hw_reg_print);
 	}
 #endif
-
+/*
 	if (use_vcmd) {
-		subsys_mgr.vcmd_mgr = hantrovcmd_init(subsys_mgr.platformdev);
+		subsys_mgr.vcmd_mgr = hantrovcmd_init(priv);
 		if (!subsys_mgr.vcmd_mgr)
 			goto err;
-	}
+	}*/
 
 	/* check for correct HW */
 	if (!CheckHwId(&subsys_mgr.hantrodec_data)) {
@@ -3362,12 +3248,13 @@ int hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported)
 	ReadCoreConfig(&subsys_mgr.hantrodec_data);
 
 	auxcore_ctx_init();
-	
-	priv->priv = owner;
-    owner->priv = priv;
+
 	if (use_vcmd) {
 		return 0;
 	}
+
+	priv->priv = owner;
+    owner->priv = priv;
 
 	memset(subsys_mgr.core_owner, 0, sizeof(subsys_mgr.core_owner));
 
@@ -3518,7 +3405,7 @@ void  hantrodec_normal_cleanup(vcx_priv_t *priv)
 #endif
 	}
 	if (use_vcmd) {
-		hantrodec_vcmd_cleanup(owner->priv);//hantrovcmd_cleanup(owner->vcmd_mgr);
+//		hantrodec_vcmd_cleanup(priv);//hantrovcmd_cleanup(owner->vcmd_mgr);
 	} else {
 		/* reset hardware */
 		ResetAsic(dev);
@@ -3532,7 +3419,7 @@ void  hantrodec_normal_cleanup(vcx_priv_t *priv)
 	}
 #ifdef SUPPORT_MMU
 	if (has_mmu)
-		MMUCleanup();//MMUCleanup(owner->platformdev);
+		MMUCleanup(owner->platformdev);
 #endif
 	ReleaseIO();
 #ifdef SUPPORT_DBGFS
@@ -3559,7 +3446,7 @@ void  hantrodec_normal_cleanup(vcx_priv_t *priv)
 #endif
 
 	//unregister_chrdev(subsys_mgr.hantrodec_major, dec_dev_n);
-
+    priv->priv = NULL;
 	pr_info("hantrodec: module removed\n");
 }
 

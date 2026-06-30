@@ -34,15 +34,6 @@ void hantroenc_normal_cleanup(vcx_priv_t *priv);
 
 int abort_vce(volatile u8 *reg_base);
 
-void vce_vcmd_watchdog_process(void *handler);
-
-void vce_vcmd_bus_err_process(void *handler);
-
-#ifdef AXI2TO1_SUPPORT
-int vce_process_subsystem_exceptions(void *handler);
-#endif
-
-
 #ifdef CONFIG_ENC_PM
 
 int vcmd_pm_suspend(void *handler);

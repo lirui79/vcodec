@@ -35,7 +35,9 @@
 #include <linux/mod_devicetable.h>
 #include <linux/dma-buf.h>
 #endif
-#include "vcm_priv.h"
+
+#include "vcx_priv.h"
+#include "mhu_v3_priv.h"
 
 #include "vcx_vcmd_priv.h"
 
@@ -63,29 +65,34 @@ static const struct file_operations hantrovcmg_fops = {
 
 static int vcm_init(vcx_priv_t *priv) {
 	int result = 0;
-	pr_info("vcx: %s called\n", __func__);
+	pr_info("vcm init: %s called\n", __func__);
 	
 	result = vcx_create_devnode(priv, &hantrovcmg_fops);
 	return result;
 }
 
 static int vcm_exit(vcx_priv_t *priv) {
-	pr_info("vcx: %s called\n", __func__);
+	pr_info("vcm exit: %s called\n", __func__);
 	return 0;
 }
 
 static int vcm_probe(struct platform_device *pdev, void *priv, int vcmd_supperted) {
 	int ret = 0;
 
-	pr_info("vcx: %s called\n", __func__);
+	pr_info("vcm: %s called\n", __func__);
+	mhu_v3_client_probe(pdev);
 	ret = vcm_init((vcx_priv_t *)priv);
 
     return ret;
 }
 
 static int vcm_remove(struct platform_device *pdev, void *priv, int vcmd_supperted) {
+	int ret = 0;
 
-	return vcm_exit((vcx_priv_t *)priv);
+	pr_info("vcm: %s called\n", __func__);
+	mhu_v3_client_remove(pdev);
+	ret = vcm_exit((vcx_priv_t *)priv);
+	return ret;
 }
 
 

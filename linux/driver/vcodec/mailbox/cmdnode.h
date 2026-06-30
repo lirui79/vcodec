@@ -11,13 +11,14 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                      include vcd private headers                             **
+**                            include cmd node header                           **
 *********************************************************************************/
 
-#ifndef _VCD_PRIVATE_H_
-#define _VCD_PRIVATE_H_
+#ifndef _MAILBOX_COMMAND_NODE_H_
+#define _MAILBOX_COMMAND_NODE_H_
 
-#include "vcx_priv.h"
+#include "cmdef.h"
+#include "cmd_inc.h"
 
 
 #ifdef __cplusplus
@@ -25,41 +26,33 @@ extern "C" {
 #endif
 
 
-int   hantrodec_vcmd_init(vcx_priv_t *priv);
+struct proc_obj;
 
-void  hantrodec_vcmd_cleanup(vcx_priv_t *priv);
+typedef struct {
+    uint64_t               procObj;// process object id
+    uint64_t               timeStamp;
+    uint32_t               ackNum;
+    uint32_t               sessionID;
+    uint32_t               code;
+    struct proc_obj       *proc;
+    struct rb_node         node;
+    wait_queue_head_t      wait;
+    struct kref            refcount;
+    uint8_t                cmdMsg[CMD_MSG_MAX_SIZE];
+} cmdnode_t;
 
-int   hantrodec_normal_init(vcx_priv_t *priv, int vcmd_supported);
+cmdnode_t*    cmdnode_alloc(uint32_t ackNum, uint32_t sessionID, uint64_t timeStamp, struct proc_obj *proc);
 
-void  hantrodec_normal_cleanup(vcx_priv_t *priv);
+int32_t       cmdnode_insert(struct rb_root *root, cmdnode_t *cnode);
 
-int   abort_vcd(volatile u8 *reg_base);
+cmdnode_t*    cmdnode_search(struct rb_root *root, uint32_t ackNum);
 
-void vcd_vcmd_watchdog_process(void *handler);
+void          cmdnode_delete(struct rb_root *root, cmdnode_t *cnode);
 
-void vcd_vcmd_bus_err_process(void *handler);
-
-#ifdef AXI2TO1_SUPPORT
-int vcd_process_subsystem_exceptions(void *handler);
-#endif
-
-#ifdef CONFIG_DEC_PM
-
-int   hantrodec_pm_suspend(void *handler);
-
-int   hantrodec_pm_resume(void *handler);
-
-int   vcmddec_pm_suspend(void *handler);
-
-int   vcmddec_pm_resume(void *handler);
-
-#endif
+void          cmdnode_free(cmdnode_t *cnode);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //_VCD_PRIVATE_H_
-
-
-
+#endif /*_MAILBOX_COMMAND_NODE_H_*/

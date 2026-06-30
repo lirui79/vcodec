@@ -29,14 +29,15 @@ enum MMUStatus MMUInit(volatile unsigned char *hwregs);
 /* Clean up all data in MMU, should be called in driver cleanup function
  * when rmmod driver
  */
-enum MMUStatus MMUCleanup(void);
+enum MMUStatus MMUCleanup(struct platform_device *platformdev);
 /* The function should be called in driver realease function
  * when driver exit unnormally
  */
 enum MMUStatus MMURelease(void *filp);
 
 enum MMUStatus MMUSetup(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
-enum MMUStatus MMUEnable(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
+
+enum MMUStatus MMUEnable(volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2], struct platform_device *platformdev);
 
 /* Used in kernel to map buffer */
 enum MMUStatus MMUKernelMemNodeMap(struct kernel_addr_desc *addr, void *filp);
@@ -50,8 +51,8 @@ enum MMUStatus MMUCreatePageTable(void *filp);
 unsigned int GetMMUPageTableArraySize(void);
 
 unsigned long long GetMMUAddress(void);
-long MMUIoctl(unsigned int cmd, void *filp, unsigned long arg,
-	      volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
+
+long MMUIoctl(unsigned int cmd, void *filp, unsigned long arg, volatile unsigned char *hwregs[MAX_SUBSYS_NUM][2]);
 
 #ifdef __cplusplus
 }

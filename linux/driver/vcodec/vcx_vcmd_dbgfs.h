@@ -116,6 +116,8 @@ struct dbgfs_priv {
 	struct dentry *root_cmdbuf[SLOT_NUM_CMDBUF];
 };
 
+#ifdef SUPPORT_DBGFS
+
 int _dbgfs_init(void *vcmd_mgr);
 void _dbgfs_init_ctx(void *vcmd_mgr, u32 store_hw_rdy_cmdbuf);
 void _dbgfs_cleanup(void *_vcmd_mgr);
@@ -129,6 +131,8 @@ void _dbgfs_reset_exe_cmdbuf_num(void *_dev_dbgfs);
 void _dbgfs_record_vcx_cycles(void *_dev_dbgfs, u32 cmdbuf_id,
 							  u32 module_type, u32 has_apb_arbiter);
 void _dbgfs_update_index(void *_dev_dbgfs);
+
+#endif
 
 #ifdef __cplusplus
 }
