@@ -66,7 +66,7 @@ extern "C" {
 
 #include "vcx_defs.h"
 #include "vcx_type.h"
-#include "cmd_session.h"
+#include "cmda78_session.h"
 #include "bidirect_list.h"
 #include "vcmdswhwregisters.h"
 
@@ -215,7 +215,7 @@ struct proc_obj {
 	u32 module_type;	/* correspond to filp, indicates subsys type */
 
 	spinlock_t job_lock;
-	cmd_session_t   *session;
+	cmda78_session_t   *session;
 	struct file *filp;
 	struct bi_list job_done_list;
 	u32 in_wait;		/* user is waiting for a specified cmdbuf run done */

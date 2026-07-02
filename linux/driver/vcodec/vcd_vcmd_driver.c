@@ -100,8 +100,8 @@
 
 /* our own stuff */
 
-#include "cmd_msg.h"
-#include "cmd_mgr.h"
+#include "cmda78_msg.h"
+#include "cmda78_mgr.h"
 #include "vcd_priv.h"
 #include "hantrovcmd.h"
 #include "vcx_kthread.h"
@@ -911,7 +911,7 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 {
 	struct cmdbuf_obj *obj;
 	bi_list_node *curr_node;
-	struct exchange_cmd_param  cmd_param;
+	struct exchange_cmda78_param  cmd_param;
 	u16 cmdbuf_id = param->cmdbuf_id;
 	long retCode = 0;
 
@@ -948,7 +948,7 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 	cmd_param.module_type = param->module_type;
 	cmd_param.core_id = param->core_id;
 
-	retCode = cmd_gen_run_cmdbuf(po, &cmd_param);
+	retCode = cmda78_gen_run_cmdbuf(po, &cmd_param);
 	param->core_id = cmd_param.core_id;
 	up(&vcmd_mgr->module_mgr[obj->module_type].sem);
 
@@ -1754,7 +1754,7 @@ static long flush_slice_regs(vcmd_mgr_t *vcmd_mgr, struct subsys_regs_desc *slic
 	iowrite32(slice_regs->regs[i].reg_data, (void __iomem *)(hwregs + 0x4));
 	obj->slice_run_done = 0;
 	spin_unlock_irqrestore(&dev->abn_irq_lock, flags);
-    return cmd_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_PUSH_SLICE_REG, cmdbuf_id);
+    return cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_PUSH_SLICE_REG, cmdbuf_id);
 }
 
 /**
@@ -1769,7 +1769,7 @@ static long drop_release_cmdbufs(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po, void
 	unsigned long flags;
 	long dropped_cmdbuf_num = 0;
 
-	dropped_cmdbuf_num = cmd_gen_drop_owner(po, (uint64_t)owner, VCMD_MGR_ID_DEC);
+	dropped_cmdbuf_num = cmda78_gen_drop_owner(po, (uint64_t)owner, VCMD_MGR_ID_DEC);
 	// remove cmdbuf reserved but not in work_list or has been dropped
 	for (i = 0; i < SLOT_NUM_CMDBUF; i++) {
 		obj = &vcmd_mgr->objs[i];
@@ -2083,7 +2083,7 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			PDEBUG("copy_from_user failed, returned %li\n", tmp);
 			return -EFAULT;
 		}
-		tmp = cmd_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_ABORT_CMDBUF, cmdbuf_id);
+		tmp = cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_ABORT_CMDBUF, cmdbuf_id);
 		if (tmp) {
 			PDEBUG("abort_cmdbuf failed, returned %li\n", tmp);
 			return -EFAULT;
@@ -2145,7 +2145,7 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			return -1;
 		if (down_interruptible(&vcmd_mgr->isr_polling_sema))
 			return -ERESTARTSYS;
-		cmd_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_POLLING_CMDBUF, core_id);
+		cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_POLLING_CMDBUF, core_id);
 		up(&vcmd_mgr->isr_polling_sema);
 		return 0;
 	}
@@ -2222,7 +2222,7 @@ static int hantrovcmd_dec_open(struct inode *inode, struct file *filp) {
 		return -EINVAL;
 	}
 
-	if (cmd_gen_open_session(po, R52_CORE_MASK_VDEC) < 0) {
+	if (cmda78_gen_open_session(po, R52_CORE_MASK_VDEC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Open session failed!\n");
 		free_process_object(po);
 		vfree(ctx);
@@ -2282,7 +2282,7 @@ static int hantrovcmd_dec_release(struct inode *inode, struct file *filp) {
 	vcmd_klog(LOGLVL_FLOW, "process obj %p for filp to be removed: %p\n",
 			(void *)po, (void *)po->filp);
 
-	if (cmd_gen_close_session(po, R52_CORE_MASK_VDEC) < 0) {
+	if (cmda78_gen_close_session(po, R52_CORE_MASK_VDEC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Close session failed!\n");
 		//return -1;
 	}
@@ -2396,11 +2396,11 @@ int hantrodec_vcmd_init(vcx_priv_t *priv) {
 	/* read all registers of main-module for each dev
 	 * for analyzing configuration in cwl
 	 */
-	cmd_set_vcmd_mgr(VCMD_MGR_ID_DEC, vcmd_mgr);
+	cmda78_set_vcmd_mgr(VCMD_MGR_ID_DEC, vcmd_mgr);
 	priv->priv = vcmd_mgr;
 	vcmd_manager = vcmd_mgr;
 #ifdef MAILBOX_CLIENT
-	if (cmd_gen_open_session(vcmd_mgr->init_po, R52_CORE_MASK_VDEC) < 0) {
+	if (cmda78_gen_open_session(vcmd_mgr->init_po, R52_CORE_MASK_VDEC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Open session failed!\n");
 		_vcmd_kthread_stop(vcmd_mgr);
 		goto err2;

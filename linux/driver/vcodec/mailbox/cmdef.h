@@ -17,7 +17,7 @@
 #ifndef _COMMAND_DEFINE_H_
 #define _COMMAND_DEFINE_H_
 
-#include "cmd_inc.h"
+#include "inc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -242,6 +242,13 @@ enum cmdError {
 
     CMD_ERR_UNKNOWN                = 0xFFFFFFFF,
 };
+
+static inline void cmd_init(cmdMsg_t *cmdMsg) {
+    cmdMsg->magic   = CMD_MAGIC_NUMBER;
+    cmdMsg->version = CMD_VERSION;
+    cmdMsg->prior   = CMD_DEFAULT_PRIORITY;
+    cmdMsg->crc32   = 0;
+}
 
 #ifdef __cplusplus
 }

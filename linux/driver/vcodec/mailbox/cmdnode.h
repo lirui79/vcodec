@@ -18,7 +18,6 @@
 #define _MAILBOX_COMMAND_NODE_H_
 
 #include "cmdef.h"
-#include "cmd_inc.h"
 
 
 #ifdef __cplusplus

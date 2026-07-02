@@ -110,8 +110,8 @@
 /* our own stuff */
 #include <linux/platform_device.h>
 
-#include "cmd_msg.h"
-#include "cmd_mgr.h"
+#include "cmda78_msg.h"
+#include "cmda78_mgr.h"
 #include "vce_priv.h"
 #include "vcx_kthread.h"
 #include "vcmdswhwregisters.h"
@@ -935,7 +935,7 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 {
 	struct cmdbuf_obj *obj;
 	bi_list_node *curr_node;
-	struct exchange_cmd_param   cmd_param;
+	struct exchange_cmda78_param   cmd_param;
 	long retCode = 0;
 	u16 cmdbuf_id = param->cmdbuf_id;
 
@@ -972,7 +972,7 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 	cmd_param.module_type = param->module_type;
 	cmd_param.core_id = param->core_id;
 
-	retCode = cmd_gen_run_cmdbuf(po, &cmd_param);
+	retCode = cmda78_gen_run_cmdbuf(po, &cmd_param);
 	param->core_id = cmd_param.core_id;
 	up(&vcmd_mgr->module_mgr[obj->module_type].sem);
 
@@ -2048,7 +2048,7 @@ static long hantrovcmd_ioctl(struct file *filp, unsigned int cmd,
 			return -1;
 		if (down_interruptible(&vcmd_mgr->isr_polling_sema))
 			return -ERESTARTSYS;
-		cmd_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_ENC, CMD_REQ_POLLING_CMDBUF, core_id);
+		cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_ENC, CMD_REQ_POLLING_CMDBUF, core_id);
 		up(&vcmd_mgr->isr_polling_sema);
 
 		return 0;
@@ -2096,7 +2096,7 @@ static int hantrovcmd_open(struct inode *inode, struct file *filp)
 		return -EINVAL;
 	}
 
-	if (cmd_gen_open_session(po, R52_CORE_MASK_VENC) < 0) {
+	if (cmda78_gen_open_session(po, R52_CORE_MASK_VENC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Open session failed!\n");
 		free_process_object(po);
 		vfree(ctx);
@@ -2180,7 +2180,7 @@ static int hantrovcmd_release(struct inode *inode, struct file *filp)
 	vcmd_klog(LOGLVL_FLOW, "process obj %p for filp to be removed: %p\n",
 			(void *)po, (void *)po->filp);
 
-	if (cmd_gen_close_session(po, R52_CORE_MASK_VENC) < 0) {
+	if (cmda78_gen_close_session(po, R52_CORE_MASK_VENC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Close session failed!\n");
 		//return -1;
 	}
@@ -2370,11 +2370,11 @@ int hantroenc_vcmd_init(vcx_priv_t *priv)
 	 * for analyzing configuration in cwl
 	 */
 
-	cmd_set_vcmd_mgr(VCMD_MGR_ID_ENC, vcmd_mgr);
+	cmda78_set_vcmd_mgr(VCMD_MGR_ID_ENC, vcmd_mgr);
 	priv->priv = (void *)vcmd_mgr;
 	vcmd_manager->priv = priv;
 #ifdef MAILBOX_CLIENT
-	if (cmd_gen_open_session(vcmd_mgr->init_po, R52_CORE_MASK_VENC) < 0) {
+	if (cmda78_gen_open_session(vcmd_mgr->init_po, R52_CORE_MASK_VENC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Open session failed!\n");
 		_vcmd_kthread_stop(vcmd_mgr);
 		goto err;

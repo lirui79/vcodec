@@ -78,7 +78,7 @@
 #include <linux/dma-buf.h>
 #endif
 
-#include "cmd_mgr.h"
+#include "cmda78_mgr.h"
 #include "vce_priv.h"
 #include "vcx_vcmd_priv.h"
 #include "vcx_vcmd.h"

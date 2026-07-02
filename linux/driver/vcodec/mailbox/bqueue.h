@@ -17,7 +17,7 @@
 #ifndef _BUFFER_QUEUE_H_
 #define _BUFFER_QUEUE_H_
 
-#include "cmd_inc.h"
+#include "inc.h"
 
 #ifdef __cplusplus
 extern "C" {

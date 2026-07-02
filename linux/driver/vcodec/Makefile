@@ -198,7 +198,7 @@ $(vcodec_dev)-objs  +=  vce_driver.o vce_vcmd_driver.o vce_normal_driver.o
 $(vcodec_dev)-objs  +=  vcd_driver.o vcd_vcmd_driver.o vcd_normal_driver.o
 $(vcodec_dev)-objs  +=  vcm_driver.o mhu_v3_client.o
 
-$(vcodec_dev)-objs  +=  mailbox/cqueue.o mailbox/bqueue.o mailbox/cmd_session.o mailbox/cmd_mgr.o mailbox/cmd_msg.o mailbox/cmd.o mailbox/cmdnode.o
+$(vcodec_dev)-objs  +=  mailbox/cqueue.o mailbox/bqueue.o mailbox/cmda78_session.o mailbox/cmda78_mgr.o mailbox/cmda78_msg.o mailbox/cmda78_proc.o mailbox/cmdnode.o
 
 obj-m         += $(vcodec_dev).o
 

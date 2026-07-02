@@ -18,6 +18,7 @@
 #define _VCX_MMU_PRIVATE_H_
 
 #include "vcx_mmu.h"
+#include <linux/platform_device.h>
 
 
 #ifdef __cplusplus

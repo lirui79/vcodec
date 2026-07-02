@@ -11,11 +11,11 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                     include command message header                           **
+**                     include command a78 message header                       **
 *********************************************************************************/
 
-#ifndef _COMMAND_MESSAGE_H_
-#define _COMMAND_MESSAGE_H_
+#ifndef _COMMANDA78_MESSAGE_H_
+#define _COMMANDA78_MESSAGE_H_
 
 #include "cmdef.h"
 
@@ -26,7 +26,7 @@ extern "C" {
 
 
 /*need to consider how many memory should be allocated for status.*/
-struct exchange_cmd_param {
+struct exchange_cmda78_param {
 	/* the instance ctx */
 	void        *owner;
 	/** control interrupt mode when generate JMP command
@@ -60,23 +60,23 @@ struct exchange_cmd_param {
 struct proc_obj;
 
 
-uint64_t   cmd_get_system_time_ms(void);
+uint64_t   cmda78_get_system_time_ms(void);
 
-int32_t    cmd_gen_open_session(struct proc_obj *proc, uint32_t coremask);
+int32_t    cmda78_gen_open_session(struct proc_obj *proc, uint32_t coremask);
 
-int32_t    cmd_gen_close_session(struct proc_obj *proc, uint32_t coremask);
+int32_t    cmda78_gen_close_session(struct proc_obj *proc, uint32_t coremask);
 
-int32_t    cmd_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmd_param *cmd_param);
+int32_t    cmda78_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmda78_param *cmd_param);
 
-int32_t    cmd_gen_wait_cmdbuf_ready(struct proc_obj *proc, uint32_t coremask);
+int32_t    cmda78_gen_wait_cmdbuf_ready(struct proc_obj *proc, uint32_t coremask);
 
-int32_t    cmd_gen_ctrl_cmdbuf(struct proc_obj *proc, uint32_t vcmdmgr_id, uint32_t cmdtype, uint32_t cmdbuf_id);
+int32_t    cmda78_gen_ctrl_cmdbuf(struct proc_obj *proc, uint32_t vcmdmgr_id, uint32_t cmdtype, uint32_t cmdbuf_id);
 
-int32_t    cmd_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t vcmdmgr_id);
+int32_t    cmda78_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t vcmdmgr_id);
 
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /*_COMMAND_MESSAGE_H_*/
+#endif /*_COMMANDA78_MESSAGE_H_*/

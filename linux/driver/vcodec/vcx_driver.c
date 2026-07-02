@@ -23,7 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/resource.h>
 #include <linux/pm_runtime.h>
-#include "cmd_mgr.h"
+#include "cmda78_mgr.h"
 #include "vcx_defs.h"
 #include "vcx_priv.h"
 
@@ -392,13 +392,13 @@ static int __init vcx_vcodec_init(void)
         "hantrodec",
     };
 
-    cmd_init_mgr();
+    cmda78_init_mgr();
 
     // 1. 创建类
     vcx_class = class_create(CLASS_NAME);
     if (IS_ERR(vcx_class)) {
         pr_err("Failed to create class\n");
-        cmd_exit_mgr();
+        cmda78_exit_mgr();
         return PTR_ERR(vcx_class);
     }
 
@@ -460,7 +460,7 @@ static int __init vcx_vcodec_init(void)
         pr_info("Registered platform device: %s.%d\n", VCX_DRIVER_NAME, i);
     }
 
-    cmd_start_mgr();
+    cmda78_start_mgr();
     return 0;
 
 err_unregister_devices:
@@ -473,7 +473,7 @@ err_chrdev:
     unregister_chrdev_region(base_dev_no, DEVICE_COUNT);
 err_class:
     class_destroy(vcx_class);
-    cmd_exit_mgr();
+    cmda78_exit_mgr();
     return ret;
 }
 
@@ -481,7 +481,7 @@ static void __exit vcx_vcodec_exit(void)
 {
     int i;
 
-    cmd_exit_mgr();
+    cmda78_exit_mgr();
     // 1. 注销所有平台设备 (这会触发驱动的 my_remove)
     for (i = DEVICE_COUNT - 1; i >= 0; i--) {
         if (vcx_priv[i].pdev) {

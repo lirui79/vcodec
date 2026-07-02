@@ -11,17 +11,17 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                       *.c command message source code                        **
+**                       *.c command a78 message source code                    **
 *********************************************************************************/
 
-#include "cmd.h"
-#include "cmd_msg.h"
-#include "cmd_mgr.h"
 #include "cmdnode.h"
+#include "cmda78_msg.h"
+#include "cmda78_mgr.h"
+#include "cmda78_proc.h"
 
 
 
-uint64_t   cmd_get_system_time_ms(void) {
+uint64_t   cmda78_get_system_time_ms(void) {
     struct timespec64 ts;
     uint64_t  time_ms = 0;
     ktime_get_real_ts64(&ts);
@@ -29,12 +29,12 @@ uint64_t   cmd_get_system_time_ms(void) {
     return time_ms;
 }
 
-static int32_t cmd_send_wait_event(cmd_session_t* session, struct proc_obj *proc, cmdMsg_t *cmdMsg, uint32_t timeout) {
+static int32_t cmda78_send_wait_event(cmda78_session_t* session, struct proc_obj *proc, cmdMsg_t *cmdMsg, uint32_t timeout) {
     cmdnode_t *cnode = NULL;
     int32_t errCode = CMD_ERR_SUCCESS;
     long retCode = 0;
 
-    retCode = cmd_session_send(session, cmdMsg);
+    retCode = cmda78_session_send(session, cmdMsg);
     cnode   = cmdnode_alloc(cmdMsg->seqNum, cmdMsg->sessionID, cmdMsg->timeStamp, proc);
 
     spin_lock(&session->spinlock);
@@ -63,9 +63,9 @@ static int32_t cmd_send_wait_event(cmd_session_t* session, struct proc_obj *proc
     return CMD_ERR_SUCCESS;
 }
 
-int32_t    cmd_gen_open_session(struct proc_obj *proc, uint32_t coremask) {
-    cmdMsg_t *cmdMsg = cmd_dequeue_cmdMsg();//    cmd_session_t* session = cmd_get_minused_r52_session0();
-    cmd_session_t* session = cmd_get_coremask_session0(coremask);
+int32_t    cmda78_gen_open_session(struct proc_obj *proc, uint32_t coremask) {
+    cmdMsg_t *cmdMsg = cmda78_dequeue_cmdMsg();//    cmd_session_t* session = cmd_get_minused_r52_session0();
+    cmda78_session_t* session = cmda78_get_coremask_session0(coremask);
     cmdReqOpenSession_Body_t *cmdBody = (cmdReqOpenSession_Body_t *)cmdMsg->data;
     long retCode = 0;
     if (session == NULL) {
@@ -77,19 +77,19 @@ int32_t    cmd_gen_open_session(struct proc_obj *proc, uint32_t coremask) {
     cmdMsg->cmdType        = CMD_REQ_OPEN_SESSION;
     cmdMsg->sessionID      = session->sessionID;
     cmdMsg->cmdSize        = CMD_MSG_MIN_SIZE + sizeof(cmdReqOpenSession_Body_t);
-    cmdMsg->timeStamp      = cmd_get_system_time_ms();
+    cmdMsg->timeStamp      = cmda78_get_system_time_ms();
     cmdBody->procObj       = (uint64_t)proc;
 
-    retCode = cmd_send_wait_event(session, proc, cmdMsg, 1000);
-    cmd_release_cmdMsg(cmdMsg);
+    retCode = cmda78_send_wait_event(session, proc, cmdMsg, 1000);
+    cmda78_release_cmdMsg(cmdMsg);
 
     return retCode;
 }
 
 
-int32_t    cmd_gen_close_session(struct proc_obj *proc, uint32_t coremask) {
-    cmdMsg_t *cmdMsg = cmd_dequeue_cmdMsg();//    cmd_session_t* session = cmd_get_minused_r52_session0();
-    cmd_session_t* session = cmd_get_coremask_session0(coremask);
+int32_t    cmda78_gen_close_session(struct proc_obj *proc, uint32_t coremask) {
+    cmdMsg_t *cmdMsg = cmda78_dequeue_cmdMsg();
+    cmda78_session_t* session = cmda78_get_coremask_session0(coremask);
     cmdReqCloseSession_Body_t *cmdBody = (cmdReqCloseSession_Body_t *)cmdMsg->data;
 
     long retCode = 0;
@@ -101,21 +101,21 @@ int32_t    cmd_gen_close_session(struct proc_obj *proc, uint32_t coremask) {
     cmdMsg->cmdType        = CMD_REQ_CLOSE_SESSION;
     cmdMsg->sessionID      = session->sessionID;
     cmdMsg->cmdSize        = CMD_MSG_MIN_SIZE + sizeof(cmdReqCloseSession_Body_t);
-    cmdMsg->timeStamp      = cmd_get_system_time_ms();
+    cmdMsg->timeStamp      = cmda78_get_system_time_ms();
 
     cmdBody->procObj       = (uint64_t)proc;
     cmdBody->sessionID     = proc->session->sessionID;
 
-    retCode = cmd_send_wait_event(session, proc, cmdMsg, 1000);
-    cmd_release_cmdMsg(cmdMsg);
+    retCode = cmda78_send_wait_event(session, proc, cmdMsg, 1000);
+    cmda78_release_cmdMsg(cmdMsg);
 
     return retCode;
 }
 
 
-int32_t    cmd_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmd_param *cmd_param) {
-    cmdMsg_t *cmdMsg = cmd_dequeue_cmdMsg();
-    cmd_session_t* session = proc->session;
+int32_t    cmda78_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmda78_param *cmd_param) {
+    cmdMsg_t *cmdMsg = cmda78_dequeue_cmdMsg();
+    cmda78_session_t* session = proc->session;
     cmdReqRunCmdBuf_Body_t *cmdBody = (cmdReqRunCmdBuf_Body_t *)cmdMsg->data;
     long retCode = 0;
     if (session == NULL) {
@@ -126,7 +126,7 @@ int32_t    cmd_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmd_param *
     cmdMsg->cmdType        = CMD_REQ_RUN_CMDBUF;
     cmdMsg->sessionID      = session->sessionID;
     cmdMsg->cmdSize        = CMD_MSG_MIN_SIZE + sizeof(cmdReqRunCmdBuf_Body_t);
-    cmdMsg->timeStamp      = cmd_get_system_time_ms();
+    cmdMsg->timeStamp      = cmda78_get_system_time_ms();
 
     cmdBody->procObj        = (uint64_t)proc;
     cmdBody->ownerID        = (uint64_t)cmd_param->owner;
@@ -139,7 +139,7 @@ int32_t    cmd_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmd_param *
     cmdBody->core_mask      = cmd_param->core_mask;
     cmdBody->input_mask     = cmd_param->input_mask;
 
-    retCode = cmd_send_wait_event(session, proc, cmdMsg, 1000);
+    retCode = cmda78_send_wait_event(session, proc, cmdMsg, 1000);
     if (retCode == CMD_ERR_SUCCESS) {
         if (cmdMsg->cmdType == CMD_RSP_RUN_CMDBUF) {
             cmdRspRunCmdBuf_Body_t *cmdBody1 = (cmdRspRunCmdBuf_Body_t *)cmdMsg->data;
@@ -147,14 +147,14 @@ int32_t    cmd_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmd_param *
             retCode = cmdBody1->code;
         }
     }
-    cmd_release_cmdMsg(cmdMsg);
+    cmda78_release_cmdMsg(cmdMsg);
 
     return retCode;
 }
 
-int32_t    cmd_gen_ctrl_cmdbuf(struct proc_obj *proc, uint32_t vcmdmgr_id, uint32_t cmdtype, uint32_t cmdbuf_id) {
-    cmdMsg_t *cmdMsg = cmd_dequeue_cmdMsg();
-    cmd_session_t* session = proc->session;
+int32_t    cmda78_gen_ctrl_cmdbuf(struct proc_obj *proc, uint32_t vcmdmgr_id, uint32_t cmdtype, uint32_t cmdbuf_id) {
+    cmdMsg_t *cmdMsg = cmda78_dequeue_cmdMsg();
+    cmda78_session_t* session = proc->session;
     cmdReqCtlCmdBuf_Body_t *cmdBody = (cmdReqCtlCmdBuf_Body_t *)cmdMsg->data;
     long retCode = 0;
     if (session == NULL) {
@@ -165,27 +165,27 @@ int32_t    cmd_gen_ctrl_cmdbuf(struct proc_obj *proc, uint32_t vcmdmgr_id, uint3
     cmdMsg->cmdType        = cmdtype;
     cmdMsg->sessionID      = session->sessionID;
     cmdMsg->cmdSize        = CMD_MSG_MIN_SIZE + sizeof(cmdReqCtlCmdBuf_Body_t);
-    cmdMsg->timeStamp      = cmd_get_system_time_ms();
+    cmdMsg->timeStamp      = cmda78_get_system_time_ms();
 
     cmdBody->procObj        = (uint64_t)proc;
     cmdBody->vcmdmgr_id     = vcmdmgr_id;
     cmdBody->cmdbuf_id      = cmdbuf_id;
 
-    retCode = cmd_send_wait_event(session, proc, cmdMsg, 1000);
+    retCode = cmda78_send_wait_event(session, proc, cmdMsg, 1000);
     if (retCode == CMD_ERR_SUCCESS) {
         if (cmdMsg->cmdType == (cmdtype + 1)) {
             cmdRspCtlCmdBuf_Body_t *cmdBody1 = (cmdRspCtlCmdBuf_Body_t *)cmdMsg->data;
             retCode = cmdBody1->code;
         }
     }
-    cmd_release_cmdMsg(cmdMsg);
+    cmda78_release_cmdMsg(cmdMsg);
 
     return retCode;
 }
 
-int32_t    cmd_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t vcmdmgr_id) {
-    cmdMsg_t *cmdMsg = cmd_dequeue_cmdMsg();
-    cmd_session_t* session = proc->session;
+int32_t    cmda78_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t vcmdmgr_id) {
+    cmdMsg_t *cmdMsg = cmda78_dequeue_cmdMsg();
+    cmda78_session_t* session = proc->session;
     cmdReqDropOwner_Body_t *cmdBody = (cmdReqDropOwner_Body_t *)cmdMsg->data;
     int32_t retCode = 0, cmdbuf_num = 0;
     if (session == NULL) {
@@ -196,13 +196,13 @@ int32_t    cmd_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t 
     cmdMsg->cmdType        = CMD_REQ_DROP_OWNER;
     cmdMsg->sessionID      = session->sessionID;
     cmdMsg->cmdSize        = CMD_MSG_MIN_SIZE + sizeof(cmdReqDropOwner_Body_t);
-    cmdMsg->timeStamp      = cmd_get_system_time_ms();
+    cmdMsg->timeStamp      = cmda78_get_system_time_ms();
 
     cmdBody->procObj        = (uint64_t)proc;
     cmdBody->ownerID        = ownerID;
     cmdBody->vcmdmgr_id     = vcmdmgr_id;
 
-    retCode = cmd_send_wait_event(session, proc, cmdMsg, 1000);
+    retCode = cmda78_send_wait_event(session, proc, cmdMsg, 1000);
     if (retCode == CMD_ERR_SUCCESS) {
         if (cmdMsg->cmdType == CMD_RSP_DROP_OWNER) {
             cmdRspDropOwner_Body_t *cmdBody1 = (cmdRspDropOwner_Body_t *)cmdMsg->data;
@@ -210,7 +210,7 @@ int32_t    cmd_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t 
             cmdbuf_num = cmdBody1->cmdbuf_num;
         }
     }
-    cmd_release_cmdMsg(cmdMsg);
+    cmda78_release_cmdMsg(cmdMsg);
 
     return cmdbuf_num;
 }

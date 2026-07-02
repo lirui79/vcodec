@@ -11,18 +11,18 @@
 **                  on all copies and should not be removed.                    **
 **                                                                              **
 **********************************************************************************
-**                      include command session source                          **
+**                      include command a78 session source                      **
 *********************************************************************************/
 
-#include "cmd.h"
-#include "cmd_mgr.h"
 #include "cmdnode.h"
-#include "cmd_session.h"
+#include "cmda78_mgr.h"
+#include "cmda78_proc.h"
+#include "cmda78_session.h"
 #include "vcx_vcmd_priv.h"
 #include "vcx_vcmd.h"
 
 
-int32_t cmd_session_init(cmd_session_t *session, struct proc_obj *proc, uint32_t sessionID) {
+int32_t cmda78_session_init(cmda78_session_t *session, struct proc_obj *proc, uint32_t sessionID) {
     session->proc      = proc;
     if (proc != NULL) {
         proc->session      = session;
@@ -36,7 +36,7 @@ int32_t cmd_session_init(cmd_session_t *session, struct proc_obj *proc, uint32_t
     return 0;
 }
 
-int32_t        cmd_session_check(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+int32_t        cmda78_session_check(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     
     if (session->seqRNum != cmdMsg->seqNum) {
         return CMD_ERR_INVALID_SEQUENCEID;
@@ -45,7 +45,7 @@ int32_t        cmd_session_check(cmd_session_t *session, cmdMsg_t *cmdMsg) {
     return 0;
 }
 
-static cmdnode_t *cmdsession_search_cmdnode(cmd_session_t *session, uint32_t ackNum) {
+static cmdnode_t *cmdsession_search_cmdnode(cmda78_session_t *session, uint32_t ackNum) {
     cmdnode_t *cnode = NULL;
     spin_lock(&session->spinlock);
     cnode = cmdnode_search(&session->cmdroot, ackNum);
@@ -66,13 +66,13 @@ static int32_t cmdsession_wake_up_all(cmdnode_t *cnode, cmdMsg_t *cmdMsg) {
 }
 
 
-static int32_t cmd_system_open_session(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+static int32_t cmd_system_open_session(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdRspOpenSession_Body_t *cmdBody = (cmdRspOpenSession_Body_t *)cmdMsg->data;
-    cmd_session_t *cmd_session = NULL;
+    cmda78_session_t *cmd_session = NULL;
     struct proc_obj *proc = NULL;
     cmdnode_t *cnode = NULL;
 
-    cmd_session = cmd_get_session(cmdBody->sessionID);
+    cmd_session = cmda78_get_session(cmdBody->sessionID);
     cnode = cmdsession_search_cmdnode(session, cmdBody->ackNum);
     if (cnode == NULL) {
         return CMD_ERR_INVALID_ACKNUM;
@@ -98,13 +98,13 @@ static int32_t cmd_system_open_session(cmd_session_t *session, cmdMsg_t *cmdMsg)
     return cmdsession_wake_up_all(cnode, cmdMsg);
 }
 
-static int32_t cmd_system_close_session(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+static int32_t cmd_system_close_session(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdRspCloseSession_Body_t *cmdBody = (cmdRspCloseSession_Body_t *)cmdMsg->data;
-    cmd_session_t *cmd_session = NULL;
+    cmda78_session_t *cmd_session = NULL;
     struct proc_obj *proc = NULL;
     cmdnode_t *cnode = NULL;
 
-    cmd_session = cmd_get_session(cmdBody->sessionID);
+    cmd_session = cmda78_get_session(cmdBody->sessionID);
     cnode = cmdsession_search_cmdnode(session, cmdBody->ackNum);
     if (cnode == NULL) {
         return CMD_ERR_INVALID_ACKNUM;
@@ -130,7 +130,7 @@ static int32_t cmd_system_close_session(cmd_session_t *session, cmdMsg_t *cmdMsg
     return cmdsession_wake_up_all(cnode, cmdMsg);
 }
 
-int32_t        cmd_session_system(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+int32_t        cmda78_session_system(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     switch (cmdMsg->cmdType) {
     case CMD_RSP_EXE_SYSCTL:  //CMD_REQ_EXE_SYSCTL:
         //return cmd_system_echo(cmdMsg);
@@ -149,7 +149,7 @@ int32_t        cmd_session_system(cmd_session_t *session, cmdMsg_t *cmdMsg) {
     return 0;
 }
 
-static int32_t          vcodec_run_cmdbuf(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+static int32_t          vcodec_run_cmdbuf(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdnode_t *cnode = NULL;
     cmdRspRunCmdBuf_Body_t *cmdBody = (cmdRspRunCmdBuf_Body_t *)cmdMsg->data;
 
@@ -166,7 +166,7 @@ static int32_t          vcodec_run_cmdbuf(cmd_session_t *session, cmdMsg_t *cmdM
     return cmdsession_wake_up_all(cnode, cmdMsg);
 }
 
-static int32_t          vcodec_ctrl_cmdbuf(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+static int32_t          vcodec_ctrl_cmdbuf(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdnode_t *cnode = NULL;
     cmdRspCtlCmdBuf_Body_t *cmdBody = (cmdRspCtlCmdBuf_Body_t *)cmdMsg->data;
 
@@ -183,7 +183,7 @@ static int32_t          vcodec_ctrl_cmdbuf(cmd_session_t *session, cmdMsg_t *cmd
     return cmdsession_wake_up_all(cnode, cmdMsg);
 }
 
-static int32_t          vcodec_drop_owner(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+static int32_t          vcodec_drop_owner(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdnode_t *cnode = NULL;
     cmdRspDropOwner_Body_t *cmdBody = (cmdRspDropOwner_Body_t *)cmdMsg->data;
 
@@ -200,7 +200,7 @@ static int32_t          vcodec_drop_owner(cmd_session_t *session, cmdMsg_t *cmdM
     return cmdsession_wake_up_all(cnode, cmdMsg);
 }
 
-static int32_t          vcodec_report_cmdbuf_ready(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+static int32_t          vcodec_report_cmdbuf_ready(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdEvtRepCmdBufReady_Body_t *cmdBody = (cmdEvtRepCmdBufReady_Body_t *)cmdMsg->data;
     vcmd_mgr_t* vcmd_mgr = NULL;
     struct cmdbuf_obj *obj = NULL;
@@ -222,7 +222,7 @@ static int32_t          vcodec_report_cmdbuf_ready(cmd_session_t *session, cmdMs
         return CMD_ERR_INVALID_VCMDMGRID;
     }
 
-    vcmd_mgr = cmd_get_vcmd_mgr(cmdBody->vcmdmgr_id);
+    vcmd_mgr = cmda78_get_vcmd_mgr(cmdBody->vcmdmgr_id);
     switch(cmdBody->vcmdmgr_id) {
         case VCMD_MGR_ID_ENC:
             vce_proc_add_done_job(vcmd_mgr, obj);
@@ -238,7 +238,7 @@ static int32_t          vcodec_report_cmdbuf_ready(cmd_session_t *session, cmdMs
     return retCode;
 }
 
-int32_t        cmd_session_vcodec(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+int32_t        cmda78_session_vcodec(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     switch (cmdMsg->cmdType) {
     case CMD_RSP_RUN_CMDBUF:  ///CMD_REQ_RUN_CMDBUF:
         return vcodec_run_cmdbuf(session, cmdMsg);
@@ -260,9 +260,9 @@ int32_t        cmd_session_vcodec(cmd_session_t *session, cmdMsg_t *cmdMsg) {
     return 0;
 }
 
-int32_t        cmd_session_send(cmd_session_t *session, cmdMsg_t *cmdMsg) {
+int32_t        cmda78_session_send(cmda78_session_t *session, cmdMsg_t *cmdMsg) {
     cmdMsg->sessionID    = session->sessionID;
     cmdMsg->seqNum       = session->seqSNum++;
     cmdMsg->timeStamp    = 0x00000000;
-    return cmd_send(cmdMsg);
+    return cmda78_send(cmdMsg);
 }

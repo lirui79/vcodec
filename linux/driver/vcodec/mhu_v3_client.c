@@ -14,7 +14,7 @@
 **                           *.c mhu v3 source code                             **
 *********************************************************************************/
 
-#include "cmd_inc.h"
+#include "inc.h"
 #include "vcx_priv.h"
 #include "mhu_v3_priv.h"
 #include "mhu_v3_client.h"
