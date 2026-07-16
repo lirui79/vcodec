@@ -222,6 +222,7 @@ static int32_t          vcodec_report_cmdbuf_ready(cmda78_session_t *session, cm
         return CMD_ERR_INVALID_VCMDMGRID;
     }
 
+    obj->cmdbuf_run_done = 1;
     vcmd_mgr = cmda78_get_vcmd_mgr(cmdBody->vcmdmgr_id);
     switch(cmdBody->vcmdmgr_id) {
         case VCMD_MGR_ID_ENC:

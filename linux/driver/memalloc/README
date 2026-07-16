@@ -42,3 +42,8 @@ The device should show up in the list /proc/devices
 Kernel messages can be viewed with
 > dmesg
 More kernel debug prints can be enabled in the Makefile
+
+> sudo bash
+> cat /proc/iomem
+> find crashkernel
+> insmod memalloc.ko alloc_size=256 alloc_base=0x90000000

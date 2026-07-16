@@ -46,3 +46,5 @@ If you want update vcx_normal_cfg.h and vcx_vcmd_cfg.h according to
 customer:project, please run create_FPGA_H.sh before run 'make', for example:
 $ ./create_FPGA_H.sh VSI:DEV
 Please confirm whether the base address determined by the platform is correct before make
+
+insmod vcodec.ko vsi_kloglvl=2

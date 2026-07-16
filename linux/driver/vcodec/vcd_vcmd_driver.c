@@ -555,7 +555,6 @@ static int proc_get_done_job(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 	unsigned long flags;
 	struct cmdbuf_obj *obj = NULL;
 	int is_done = 0, i;
-
 	spin_lock_irqsave(&po->job_lock, flags);
 	node = list->head;
 
@@ -791,7 +790,7 @@ static int acquire_process_resource(struct proc_obj *po, u64 workload)
 	spin_unlock(&po->spinlock);
 	if (wait_event_interruptible(po->resource_waitq,
 									wait_process_resource_rdy(po))) {
-		vcmd_klog(LOGLVL_ERROR, "%s: wait event is interrupted!", __func__);
+		vcmd_klog(LOGLVL_ERROR, "%s %s %d: wait event is interrupted!", __FILE__, __func__, __LINE__);
 		return -1;
 	}
 
@@ -835,11 +834,13 @@ static long reserve_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 	}
 	vcmd_klog(LOGLVL_FLOW, "reserve cmdbuf by filp %p\n", (void *)po->filp);
 
-	if (acquire_process_resource(po, param->executing_time))
+	if (acquire_process_resource(po, param->executing_time)) {
 		return -1;
+	}
 
-	if (acquire_cmdbuf(vcmd_mgr, &cmdbuf_id))
+	if (acquire_cmdbuf(vcmd_mgr, &cmdbuf_id)) {
 		return -ERESTARTSYS;
+	}
 
 	reset_cmdbuf_obj(vcmd_mgr, cmdbuf_id);
 	reset_cmdbuf_node(vcmd_mgr, cmdbuf_id);
@@ -876,10 +877,9 @@ static long release_cmdbuf(vcmd_mgr_t *vcmd_mgr,
 {
 	struct cmdbuf_obj *obj = NULL;
 	bi_list_node *curr_node = NULL;
-
 	if (cmdbuf_id >= SLOT_NUM_CMDBUF) {
 		//should not happen
-		vcmd_klog(LOGLVL_ERROR, "%s: ERROR cmdbuf_id %d!!\n", __func__, cmdbuf_id);
+		vcmd_klog(LOGLVL_ERROR, "%s %s %d: ERROR cmdbuf_id %d!!\n", __FILE__, __func__, __LINE__, cmdbuf_id);
 		return -1;
 	}
 
@@ -911,7 +911,7 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 {
 	struct cmdbuf_obj *obj;
 	bi_list_node *curr_node;
-	struct exchange_cmda78_param  cmd_param;
+	struct exchange_cmda78_param  cmd_param = {0};
 	u16 cmdbuf_id = param->cmdbuf_id;
 	long retCode = 0;
 
@@ -930,8 +930,7 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 		return -1;
 	}
 
-	obj->cmdbuf_size = param->cmdbuf_size;
-	obj->workload    = param->executing_time;
+	obj->cmdbuf_size = param->cmdbuf_size;//obj->workload    = param->executing_time;
 #ifdef VCMD_DEBUG_INTERNAL
 	_dbg_log_cmdbuf(obj);
 #endif
@@ -947,8 +946,15 @@ static long link_and_run_cmdbuf(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 	cmd_param.interrupt_ctrl = param->executing_time;
 	cmd_param.module_type = param->module_type;
 	cmd_param.core_id = param->core_id;
-
+#ifdef MAILBOX_CLIENT
 	retCode = cmda78_gen_run_cmdbuf(po, &cmd_param);
+#else
+	retCode = 0;//	printk("%s %s %d:obj->core_id:%d\n", __FILE__, __func__, __LINE__, obj->core_id);
+	obj->core_id = 0;
+	cmd_param.core_id = obj->core_id;
+	obj->cmdbuf_run_done = 1;
+	vcd_proc_add_done_job(vcmd_mgr, obj);
+#endif
 	param->core_id = cmd_param.core_id;
 	up(&vcmd_mgr->module_mgr[obj->module_type].sem);
 
@@ -972,7 +978,7 @@ static long wait_cmdbuf_ready(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po,
 	}
 
 	if (cmdbuf_id != ANY_CMDBUF_ID) {
-		vcmd_klog(LOGLVL_FLOW, "%s\n", __func__);
+		vcmd_klog(LOGLVL_FLOW, "%s %s %d\n", __FILE__, __func__, __LINE__);
 		obj = &vcmd_mgr->objs[cmdbuf_id];
 		if (obj->po != po) {
 			//should not happen
@@ -1184,6 +1190,7 @@ static void dev_ctx_init(vcmd_mgr_t *vcmd_mgr)
 
 	memset(vcmd_mgr->dev_ctx,
 			0, sizeof(struct hantrovcmd_dev) * vcmd_mgr->subsys_num);
+
 	for (i = 0; i < vcmd_mgr->subsys_num; i++) {
 		dev = &vcmd_mgr->dev_ctx[i];
 
@@ -1227,9 +1234,8 @@ static void dev_ctx_init(vcmd_mgr_t *vcmd_mgr)
 								i * SLOT_SIZE_REGBUF;
 		dev->reg_mem_va = vcmd_mgr->mem_regs.va + i * SLOT_SIZE_REGBUF / 4;
 		dev->reg_mem_sz = SLOT_SIZE_REGBUF;
-#ifdef VCMD_ALLOC_MEM
 		memset(dev->reg_mem_va, 0, dev->reg_mem_sz);
-#endif
+
 		dev->pa_trans_offset = vcmd_mgr->pa_trans_offset;
 
 		module = &vcmd_mgr->module_mgr[m_type];
@@ -1239,6 +1245,14 @@ static void dev_ctx_init(vcmd_mgr_t *vcmd_mgr)
 
 		vcmd_klog(LOGLVL_CONFIG, "module init - vcmdcore[%d] addr =0x%llx\n",
 			i, (unsigned long long)dev->subsys_info->reg_base);
+#ifndef VCMD_ALLOC_MEM
+        {
+           u32 *main_regs_va = NULL;
+           main_regs_va = dev->reg_mem_va + dev->subsys_info->reg_off[SUB_MOD_MAIN] / 4 + 0;
+           *main_regs_va = (u32)0x6732FFFF;
+           *(main_regs_va + 309)= (u32)0x00001FF0;
+        }
+#endif
 	}
 }
 
@@ -1367,9 +1381,9 @@ static int vcmd_mmu_kernel_map(vcmd_mgr_t *vcmd_mgr, struct file *filp)
 	struct noncache_mem mem[3];
 	int i;
 
-	mem[0] = vcmd_mgr->mem_vcmd,
-	mem[1] = vcmd_mgr->mem_status,
-	mem[2] = vcmd_mgr->mem_regs
+	mem[0] = vcmd_mgr->mem_vcmd;
+	mem[1] = vcmd_mgr->mem_status;
+	mem[2] = vcmd_mgr->mem_regs;
 
 	for (i = 0; i < 3; i++) {
 		mmu_addr.bus_address = mem[i].pa;
@@ -1705,9 +1719,15 @@ void hantrodec_vcmd_cleanup(vcx_priv_t *priv)
 	_dbgfs_cleanup((void *)vcmd_mgr);
 #endif
 #ifdef SUPPORT_MMU
+    if (vcmd_mgr->mmu_enable) {
 		MMUCleanup(vcmd_mgr->platformdev);
+	}
 #endif
+
+#ifdef VCMD_ALLOC_MEM
 	vcmd_release_IO(vcmd_mgr);
+#endif
+
 	vfree(dev_ctx);
 
 	//release_vcmd_non_cachable_memory();
@@ -1737,7 +1757,7 @@ static long flush_slice_regs(vcmd_mgr_t *vcmd_mgr, struct subsys_regs_desc *slic
 	volatile u8 *hwregs;
 	unsigned long flags;
 	u32 reg_id;
-	int i;
+	int i = 0;
 
 	node = &vcmd_mgr->nodes[cmdbuf_id];
 	obj = (struct cmdbuf_obj *)node->data;
@@ -1754,6 +1774,7 @@ static long flush_slice_regs(vcmd_mgr_t *vcmd_mgr, struct subsys_regs_desc *slic
 	iowrite32(slice_regs->regs[i].reg_data, (void __iomem *)(hwregs + 0x4));
 	obj->slice_run_done = 0;
 	spin_unlock_irqrestore(&dev->abn_irq_lock, flags);
+
     return cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_PUSH_SLICE_REG, cmdbuf_id);
 }
 
@@ -1768,8 +1789,9 @@ static long drop_release_cmdbufs(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po, void
 	u32 i;
 	unsigned long flags;
 	long dropped_cmdbuf_num = 0;
-
+#ifdef MAILBOX_CLIENT
 	dropped_cmdbuf_num = cmda78_gen_drop_owner(po, (uint64_t)owner, VCMD_MGR_ID_DEC);
+#endif
 	// remove cmdbuf reserved but not in work_list or has been dropped
 	for (i = 0; i < SLOT_NUM_CMDBUF; i++) {
 		obj = &vcmd_mgr->objs[i];
@@ -1838,6 +1860,381 @@ static long wait_owner_done(vcmd_mgr_t *vcmd_mgr, struct proc_obj *po, void *own
 	return ret;
 }
 
+
+/*---------------------------------------------------------
+ * Function name : hantrodec_ioctl
+ * Description   : communication method to/from the user space
+ * Return type   : long
+ *----------------------------------------------------------
+ */
+static long hantrodec_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	int err = 0;
+	long tmp;
+	struct vcmd_priv_ctx *ctx = (struct vcmd_priv_ctx *)filp->private_data;
+	vcmd_mgr_t *vcmd_mgr = (vcmd_mgr_t *)ctx->vcmd_mgr;
+	/*
+	 * the direction is a bitmask, and VERIFY_WRITE catches R/W
+	 * transfers. `Type' is user-oriented, while
+	 * access_ok is kernel-oriented, so the concept of "read" and
+	 * "write" is reversed
+	 */
+#if (KERNEL_VERSION(5, 0, 0) > LINUX_VERSION_CODE)
+	if (_IOC_DIR(cmd) & _IOC_READ)
+		err = !access_ok(VERIFY_WRITE, (void __user *)arg,
+						 _IOC_SIZE(cmd));
+	else if (_IOC_DIR(cmd) & _IOC_WRITE)
+		err = !access_ok(VERIFY_READ, (void __user *)arg,
+						 _IOC_SIZE(cmd));
+#else
+	if (_IOC_DIR(cmd) & _IOC_READ)
+		err = !access_ok((void *)arg, _IOC_SIZE(cmd));
+	else if (_IOC_DIR(cmd) & _IOC_WRITE)
+		err = !access_ok((void *)arg, _IOC_SIZE(cmd));
+#endif
+
+	if (err)
+		return -EFAULT;
+
+	switch (cmd) {
+	case HANTRODEC_IOC_CLI: {
+		break;
+	}
+	case HANTRODEC_IOC_STI: {
+		break;
+	}
+	case HANTRODEC_IOCGHWOFFSET: {
+		break;
+	}
+	case HANTRODEC_IOCGHWIOSIZE: {
+		struct regsize_desc core;
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct regsize_desc));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		if (core.id >= MAX_SUBSYS_NUM)
+			return -EFAULT;
+
+        core.slice = 0x0101;
+		core.size = MAX_REG_COUNT * sizeof(u32);
+		tmp = copy_to_user((u32 __user *)arg, &core, sizeof(struct regsize_desc));
+		if (tmp) {
+			PDEBUG("copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec core reg %ld %ld:%x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct regsize_desc), tmp, core.type, core.slice, core.id, core.size);
+		return 0;
+	}
+	case HANTRODEC_IOC_MC_OFFSETS: {
+		unsigned long multicorebase[HXDEC_MAX_CORES] = {0};
+		for (int i = 0; i < vcmd_mgr->subsys_num; i++) {
+			multicorebase[i] = vcmd_core_array[i].vcmd_base_addr + vcmd_core_array[i].submodule_cfg[SUB_MOD_MAIN].io_off;
+		}
+		tmp = copy_to_user((unsigned long __user *)arg,	multicorebase, sizeof(multicorebase));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOC_MC_OFFSETS copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d get multi core base %ld:%lx %lx %lx %lx\n", __FILE__, __func__, __LINE__, tmp, multicorebase[0], multicorebase[1], multicorebase[2], multicorebase[3]);
+		break;
+	}
+	case HANTRODEC_IOC_MC_CORES: {
+		__put_user(vcmd_mgr->subsys_num, (unsigned int __user *)arg);
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d get cores = %d\n", __FILE__, __func__, __LINE__, vcmd_mgr->subsys_num);
+		break;
+	}
+	case HANTRODEC_IOCS_DEC_PUSH_REG: {
+		struct core_desc core;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_desc));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec push reg %ld %ld:%x %x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct core_desc), tmp, core.type, core.regs, core.id, core.size, core.reg_id);
+		return 0;//return DecFlushRegs(&subsys_mgr.hantrodec_data, &core);
+	}
+	case HANTRODEC_IOCS_DEC_WRITE_REG: {
+		struct core_desc core;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_desc));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOCS_DEC_WRITE_REG copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec write reg %ld %ld:%x %x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct core_desc), tmp, core.type, core.regs, core.id, core.size, core.reg_id);
+		return 0;//return DecWriteRegs(&subsys_mgr.hantrodec_data, &core);
+	}
+	case HANTRODEC_IOCS_DEC_WRITE_APBFILTER_REG: {
+		struct core_desc core;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_desc));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+        core.id = 01;
+        core.regs = (u32*)0x1234680;
+        core.size = MAX_REG_COUNT * 4;
+        core.reg_id = 0x998;
+
+		tmp = copy_to_user((__u32 __user *)arg,	&core, sizeof(struct core_desc));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOCS_DEC_WRITE_APBFILTER_REG copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec apbfilter reg %ld %ld:%x %x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct core_desc), tmp, core.type, core.regs, core.id, core.size, core.reg_id);
+		return 0;//return DecWriteApbFilterRegs(&subsys_mgr.hantrodec_data, &core);
+	}
+	case HANTRODEC_IOCS_PP_PUSH_REG: {	/* get registers from user space*/
+		return -EINVAL;
+	}
+	case HANTRODEC_IOCS_DEC_PULL_REG: {
+		struct core_desc core;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_desc));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+        core.id = 01;
+        core.regs = (u32*)0x789980;
+        core.size = MAX_REG_COUNT * 4;
+        core.reg_id = 0x38;
+
+		tmp = copy_to_user((__u32 __user *)arg,	&core, sizeof(struct core_desc));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOCS_DEC_PULL_REG copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec pull reg %ld %ld:%x %x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct core_desc), tmp, core.type, core.regs, core.id, core.size, core.reg_id);
+		return 0;//return DecRefreshRegs(&subsys_mgr.hantrodec_data, &core);
+	}
+	case HANTRODEC_IOCS_DEC_READ_REG: {
+		struct core_desc core;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_desc));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+        core.id = 01;
+        core.regs = (u32*)0x4567890;
+        core.size = MAX_REG_COUNT * 4;
+        core.reg_id = 0x28;
+
+		tmp = copy_to_user((__u32 __user *)arg,	&core, sizeof(struct core_desc));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOCS_DEC_READ_REG copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec read reg %ld %ld:%x %x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct core_desc), tmp, core.type, core.regs, core.id, core.size, core.reg_id);
+		return 0;//return DecReadRegs(&subsys_mgr.hantrodec_data, &core);
+	}
+	case HANTRODEC_IOCS_PP_PULL_REG: {
+		return -EINVAL;
+	}
+	case HANTRODEC_IOCH_DEC_RESERVE: {
+		struct req_core_info core_info;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&core_info, (void __user *)arg, sizeof(struct req_core_info));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec reserve %ld %ld:%x %p\n", __FILE__, __func__, __LINE__, sizeof(struct req_core_info), tmp, core_info.format, core_info.dec_inst);
+		return 0;//return ReserveDecoder(&subsys_mgr.hantrodec_data, filp, &core_info);
+	}
+	case HANTRODEC_IOCT_DEC_RELEASE: {
+		u32 core = 0;
+
+		__get_user(core, (unsigned long __user *)arg);
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec release %ld %ld\n", __FILE__, __func__, __LINE__, sizeof(u32), core);
+        //ReleaseDecoder(&subsys_mgr.hantrodec_data, core);
+
+		break;
+	}
+	case HANTRODEC_IOCQ_PP_RESERVE:
+		return -EINVAL;
+	case HANTRODEC_IOCT_PP_RELEASE: {
+		return -EINVAL;
+	}
+	case HANTRODEC_IOCX_DEC_WAIT: {
+		struct core_desc core;
+
+		/* get registers from user space */
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_desc));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+        core.id = 01;
+        core.regs = (u32*)0x3000;
+        core.size = MAX_REG_COUNT * 4;
+        core.reg_id = 0x128;
+
+		tmp = copy_to_user((__u32 __user *)arg,	&core, sizeof(struct core_desc));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOCX_DEC_WAIT copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d dec wait %ld %ld:%x %x %x %x %x\n", __FILE__, __func__, __LINE__, sizeof(struct core_desc), tmp, core.type, core.regs, core.id, core.size, core.reg_id);
+		return 0;//return WaitDecReadyAndRefreshRegs(&subsys_mgr.hantrodec_data, &core);
+	}
+	case HANTRODEC_IOCX_PP_WAIT: {
+		return -EINVAL;
+	}
+	case HANTRODEC_IOCG_CORE_WAIT: {
+		int id;
+		//tmp = WaitCoreReady(&subsys_mgr.hantrodec_data, filp, &id);
+		id = 1;
+		__put_user(id, (int __user *)arg);
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d core wait %ld %ld\n", __FILE__, __func__, __LINE__, sizeof(int), id);
+		return tmp;
+	}
+	case HANTRODEC_IOCH_WAIT_OWNER_DONE: {
+		void *owner = NULL;
+		tmp = copy_from_user(&owner, (void __user *)arg, sizeof(void *));
+	//tmp = wait_owner_done(&subsys_mgr.hantrodec_data, filp, (void *)arg);
+		tmp = 1;
+		if (tmp < 0) {
+			vcmd_klog(LOGLVL_ERROR, "drop_owner failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d wait owner done %ld %ld:%x %x\n", __FILE__, __func__, __LINE__, sizeof(void *), tmp, (void*)arg, owner);
+		return tmp;
+	}
+	case HANTRODEC_IOX_ASIC_ID: {
+		struct core_param core;
+		/* get registers from user space*/
+		tmp = copy_from_user(&core, (void __user *)arg, sizeof(struct core_param));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		core.asic_id = 0x6732FFFF;
+		tmp = copy_to_user((u32 __user *)arg, &core, sizeof(struct core_param));
+		if (tmp) {
+			PDEBUG("copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d get asic id %ld %ld:%x\n", __FILE__, __func__, __LINE__, sizeof(struct core_param), tmp, core.id);
+		vcmd_klog(LOGLVL_CONFIG, "%x %x %x %x\n", core.slice, core.type, core.size, core.asic_id);
+		return 0;
+	}
+	case HANTRODEC_IOCG_CORE_ID: {
+		return 0;//return GetDecCoreID(&subsys_mgr.hantrodec_data, filp, format);
+	}
+	case HANTRODEC_IOX_ASIC_BUILD_ID: {
+		u32 id, hw_id;
+
+		__get_user(id, (u32 __user *)arg);
+        hw_id = (u32)0x00001FF0;
+		__put_user(hw_id, (u32 __user *)arg);
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d get build id:%x %x\n", __FILE__, __func__, __LINE__, id, hw_id);
+		return 0;
+	}
+	case HANTRODEC_DEBUG_STATUS: {
+		return 0;
+	}
+	case HANTRODEC_IOX_SUBSYS: {
+		struct subsys_desc subsys = { 0 };
+		/* TODO(min): check all the subsys */
+		subsys.subsys_vcmd_num = 1;
+		subsys.subsys_num = subsys.subsys_vcmd_num;
+		tmp = copy_to_user((u32 __user *)arg, &subsys, sizeof(struct subsys_desc));
+		if (tmp) {
+			vcmd_klog(LOGLVL_ERROR, "ioctl HANTRODEC_IOX_SUBSYS copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d get subsys num %ld:%d %d\n", __FILE__, __func__, __LINE__, tmp, subsys.subsys_vcmd_num, subsys.subsys_num);
+        break;
+	}
+	case HANTRODEC_IOCX_POLL: {
+		//hantrodec_isr(0, &subsys_mgr.hantrodec_data);
+		return 0;
+	}
+	case HANTRODEC_IOC_APBFILTER_CONFIG: {
+		struct apbfilter_cfg tmp_apbfilter;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&tmp_apbfilter, (void __user *)arg, sizeof(struct apbfilter_cfg));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		if (tmp_apbfilter.id >= MAX_SUBSYS_NUM ||
+		    tmp_apbfilter.type >= HW_CORE_MAX)
+			return -EFAULT;
+
+        tmp_apbfilter.id = 1;
+	    tmp_apbfilter.has_apbfilter = 3;
+		tmp_apbfilter.nbr_mask_regs = 0xf1e2;
+		tmp_apbfilter.mask_reg_offset = 0x10000;
+		tmp_apbfilter.page_sel_addr = 0x5000;
+		tmp_apbfilter.num_mode = 0x13;
+		tmp_apbfilter.mask_bits_per_reg = 0x80;
+
+		tmp = copy_to_user((u32 __user *)arg, &tmp_apbfilter, sizeof(struct apbfilter_cfg));
+		if (tmp) {
+			PDEBUG("copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d apb filter config %ld %ld:%x\n", __FILE__, __func__, __LINE__, sizeof(struct apbfilter_cfg), tmp, tmp_apbfilter.type);
+		vcmd_klog(LOGLVL_CONFIG, "config:%x %x %x %x %x %x %x\n", tmp_apbfilter.id, tmp_apbfilter.has_apbfilter, tmp_apbfilter.nbr_mask_regs, tmp_apbfilter.mask_reg_offset, tmp_apbfilter.page_sel_addr, tmp_apbfilter.num_mode, tmp_apbfilter.mask_bits_per_reg);
+		return 0;
+	}
+	case HANTRODEC_IOC_AXIFE_CONFIG: {
+		struct axife_cfg tmp_axife;
+
+		/* get registers from user space*/
+		tmp = copy_from_user(&tmp_axife, (void __user *)arg, sizeof(struct axife_cfg));
+		if (tmp) {
+			PDEBUG("copy_from_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		if (tmp_axife.id >= MAX_SUBSYS_NUM)
+			return -EFAULT;
+		tmp_axife.id = 1;
+	    tmp_axife.axi_rd_chn_num = 0x20;
+	    tmp_axife.axi_wr_chn_num = 0x10;
+	    tmp_axife.axi_rd_burst_length = 0x30;
+	    tmp_axife.axi_wr_burst_length = 0x40;
+	    tmp_axife.fe_mode = 0xef;
+		tmp = copy_to_user((u32 __user *)arg, &tmp_axife, sizeof(struct axife_cfg));
+		if (tmp) {
+			PDEBUG("copy_to_user failed, returned %li\n", tmp);
+			return -EFAULT;
+		}
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d axife config %ld %ld:%x\n", __FILE__, __func__, __LINE__, sizeof(struct axife_cfg), tmp, tmp_axife.id);
+		vcmd_klog(LOGLVL_CONFIG, "config:%x %x %x %x %x %x\n", tmp_axife.id, tmp_axife.axi_rd_chn_num, tmp_axife.axi_wr_chn_num, tmp_axife.axi_rd_burst_length, tmp_axife.axi_wr_burst_length, tmp_axife.fe_mode);
+		return 0;
+	}
+	default:
+		return -ENOTTY;
+	}
+
+	return 0;
+}
+
 /**
  * @brief ioctl function of vcmd driver.
  */
@@ -1854,6 +2251,11 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 	 * wrong cmds: return ENOTTY (inappropriate ioctl)
 	 * before access_ok()
 	 */
+	if ((_IOC_TYPE(cmd) == HANTRODEC_IOC_MAGIC && _IOC_NR(cmd) <= HANTRODEC_IOC_MAXNR)) {
+		return hantrodec_ioctl(filp, cmd, arg);
+	}
+
+
 	if (_IOC_TYPE(cmd) != HANTRO_VCMD_IOC_MAGIC) {
 #ifdef SUPPORT_MMU
 		if (_IOC_TYPE(cmd) != HANTRO_IOC_MMU) {
@@ -1910,7 +2312,7 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 	}*/
 
 	case HANTRO_VCMD_IOCH_GET_CMDBUF_PARAMETER: {
-		struct cmdbuf_mem_parameter mem;
+		struct cmdbuf_mem_parameter mem = {0};
 
 		vcmd_klog(LOGLVL_CONFIG, "VCMD get cmdbuf parameter\n");
 		mem.cmdbuf_unit_size = SLOT_SIZE_CMDBUF;
@@ -1926,8 +2328,16 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 		mem.mmu_phy_cmdbuf_addr = vcmd_mgr->mem_vcmd.mmu_ba;
 		mem.mmu_phy_vcmd_regbuf_addr = vcmd_mgr->mem_regs.mmu_ba;
 		mem.base_ddr_addr = vcmd_mgr->pa_trans_offset;
-		tmp = copy_to_user((struct cmdbuf_mem_parameter __user *)arg,
-				 &mem, sizeof(struct cmdbuf_mem_parameter));
+		tmp = copy_to_user((void __user *)arg, &mem, sizeof(struct cmdbuf_mem_parameter));
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d VCMD get cmdbuf parameter %ld %ld:%x\n", __FILE__, __func__, __LINE__, sizeof(struct cmdbuf_mem_parameter), tmp, mem.base_ddr_addr);
+
+		vcmd_klog(LOGLVL_CONFIG, "cmdbuf:%x %x %x %x %x\n", mem.phy_cmdbuf_addr, mem.mmu_phy_cmdbuf_addr, mem.virt_cmdbuf_addr, mem.cmdbuf_total_size, mem.cmdbuf_unit_size);
+
+		vcmd_klog(LOGLVL_CONFIG, "status:%x %x %x %x %x\n", mem.phy_status_cmdbuf_addr, mem.mmu_phy_status_cmdbuf_addr, mem.virt_status_cmdbuf_addr, mem.status_cmdbuf_total_size, mem.status_cmdbuf_unit_size);
+
+		vcmd_klog(LOGLVL_CONFIG, "regbuf:%x %x %x %x %x\n", mem.phy_vcmd_regbuf_addr, mem.mmu_phy_vcmd_regbuf_addr, mem.virt_vcmd_regbuf_addr, mem.vcmd_regbuf_total_size, mem.vcmd_regbuf_unit_size);
+
 		if (tmp) {
 			vcmd_klog(LOGLVL_ERROR, "copy_to_user failed, returned %li\n", tmp);
 			return -EFAULT;
@@ -1984,6 +2394,9 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			return -EFAULT;
 		}
 
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d VCMD get vcmd config parameter %ld %ld:%x\n", __FILE__, __func__, __LINE__, sizeof(struct config_parameter), tmp, param.module_type);
+		vcmd_klog(LOGLVL_CONFIG, "%x %x %x %x %x %x %x\n", param.vcmd_core_num, param.submodule_main_addr, param.submodule_dec400_addr, param.submodule_MMU_addr, param.submodule_MMUWrite_addr, param.submodule_axife_addr, param.vcmd_hw_version_id);
+
 		break;
 	}
 	case HANTRO_VCMD_IOCH_RESERVE_CMDBUF: {
@@ -2008,7 +2421,9 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 				return -EFAULT;
 			}
 		}
-		vcmd_klog(LOGLVL_CONFIG, "VCMD Reserve CMDBUF %d\n", param.cmdbuf_id);
+
+		vcmd_klog(LOGLVL_CONFIG, "%s %s %d VCMD Reserve CMDBUF %ld %ld:%x\n", __FILE__, __func__, __LINE__, sizeof(struct exchange_parameter), tmp, param.module_type);
+		vcmd_klog(LOGLVL_CONFIG, "%p %x %x %x %x %x %x\n", param.owner, param.executing_time, param.cmdbuf_size, param.cmdbuf_id, param.core_id, param.core_mask, param.input_mask);
 		return ret;
 	}
 
@@ -2029,6 +2444,7 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 		retVal = link_and_run_cmdbuf(vcmd_mgr, po, &param);
 		tmp = copy_to_user((struct exchange_parameter __user *)arg,
 				 &param, sizeof(struct exchange_parameter));
+		vcmd_klog(LOGLVL_CONFIG, "VCMD link and run CMDBUF %d , %d %d\n", param.cmdbuf_id, retVal, tmp);
 		if (tmp) {
 			vcmd_klog(LOGLVL_ERROR, "copy_to_user failed, returned %li\n", tmp);
 			return -EFAULT;
@@ -2045,11 +2461,11 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 		/*high 16 bits are core id, low 16 bits are cmdbuf_id*/
 
 		vcmd_klog(LOGLVL_FLOW, "VCMD wait for CMDBUF %d finishing.\n", cmdbuf_id);
-
 		tmp = wait_cmdbuf_ready(vcmd_mgr, po, cmdbuf_id, &cmdbuf_id);
+		vcmd_klog(LOGLVL_FLOW, "VCMD wait for CMDBUF %d finishing %d.\n", cmdbuf_id, tmp);
 		if (tmp >= 0) {
 			__put_user(cmdbuf_id, (u16 __user *)arg);
-			return tmp;
+			return 0;
 		}
 		__put_user(0, (u16 __user *)arg);
 		return -1;
@@ -2069,7 +2485,11 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			PDEBUG("copy_from_user failed, returned %li\n", tmp);
 			return -EFAULT;
 		}
+#ifdef MAILBOX_CLIENT
 		return flush_slice_regs(vcmd_mgr, &slice_regs, po);
+#else
+		return 0;
+#endif
 	}
 
 	case HANTRO_VCMD_IOCH_ABORT_CMDBUF: {
@@ -2083,7 +2503,9 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			PDEBUG("copy_from_user failed, returned %li\n", tmp);
 			return -EFAULT;
 		}
+#ifdef MAILBOX_CLIENT
 		tmp = cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_ABORT_CMDBUF, cmdbuf_id);
+#endif
 		if (tmp) {
 			PDEBUG("abort_cmdbuf failed, returned %li\n", tmp);
 			return -EFAULT;
@@ -2145,7 +2567,9 @@ static long hantrovcmd_dec_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			return -1;
 		if (down_interruptible(&vcmd_mgr->isr_polling_sema))
 			return -ERESTARTSYS;
+#ifdef MAILBOX_CLIENT
 		cmda78_gen_ctrl_cmdbuf(po, VCMD_MGR_ID_DEC, CMD_REQ_POLLING_CMDBUF, core_id);
+#endif
 		up(&vcmd_mgr->isr_polling_sema);
 		return 0;
 	}
@@ -2222,12 +2646,14 @@ static int hantrovcmd_dec_open(struct inode *inode, struct file *filp) {
 		return -EINVAL;
 	}
 
+#ifdef MAILBOX_CLIENT
 	if (cmda78_gen_open_session(po, R52_CORE_MASK_VDEC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Open session failed!\n");
 		free_process_object(po);
 		vfree(ctx);
 		return -EINVAL;
 	}
+#endif
 
 	po->filp = filp;
 	po->module_type = ((vcmd_mgr_t *)ctx->vcmd_mgr)->core_array[0].sub_module_type;
@@ -2282,10 +2708,12 @@ static int hantrovcmd_dec_release(struct inode *inode, struct file *filp) {
 	vcmd_klog(LOGLVL_FLOW, "process obj %p for filp to be removed: %p\n",
 			(void *)po, (void *)po->filp);
 
+#ifdef MAILBOX_CLIENT
 	if (cmda78_gen_close_session(po, R52_CORE_MASK_VDEC) < 0) {
 		vcmd_klog(LOGLVL_ERROR, "Close session failed!\n");
 		//return -1;
 	}
+#endif
 
 	free_process_object(ctx->po);
 	ctx->po = NULL;
@@ -2336,11 +2764,10 @@ int hantrodec_vcmd_init(vcx_priv_t *priv) {
 	vcmd_mgr->mem_vcmd.size = ALIGN_4K(SLOT_NUM_CMDBUF * SLOT_SIZE_CMDBUF);
 	vcmd_mgr->mem_status.size = ALIGN_4K(SLOT_NUM_CMDBUF * SLOT_SIZE_STATUSBUF);
 	vcmd_mgr->mem_regs.size = ALIGN_4K(vcmd_mgr->subsys_num * SLOT_SIZE_REGBUF);
-#ifdef VCMD_ALLOC_MEM
 	result = vcmd_init(vcmd_mgr);
 	if (result)
 		goto err;
-#endif
+
 	dev_ctx = vmalloc(sizeof(struct hantrovcmd_dev) * vcmd_mgr->subsys_num);
 	if (!dev_ctx) {
 		vcmd_klog(LOGLVL_ERROR, "Create dev ctx failed!\n");
@@ -2413,7 +2840,9 @@ int hantrodec_vcmd_init(vcx_priv_t *priv) {
 err2:
     cdev_del(&priv->cdev);
 err0:
+#ifdef VCMD_ALLOC_MEM
 	vcmd_release_IO(vcmd_mgr);
+#endif
 
 err:
 #ifdef PCIE_EN

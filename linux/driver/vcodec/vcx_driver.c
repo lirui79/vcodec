@@ -240,7 +240,7 @@ static int vcx_vcodec_probe(struct platform_device *pdev)
 }
 
 // 注意：Linux 6.x+ 内核 remove 返回 void
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 static void vcx_vcodec_remove(struct platform_device *pdev)
 {
     vcx_priv_t *priv = platform_get_drvdata(pdev);
@@ -263,7 +263,7 @@ static void vcx_vcodec_remove(struct platform_device *pdev)
     }
 }
 #else
-static int vcx_vcodec_remove(struct platform_device *dev)
+static int vcx_vcodec_remove(struct platform_device *pdev)
 {
     vcx_priv_t *priv = platform_get_drvdata(pdev);
     int ret = 0;
@@ -355,7 +355,11 @@ MODULE_DEVICE_TABLE(of, vcx_vcodec_of_match);
 // ------------------------------------------------------------------
 static struct platform_driver vcx_vcodec_driver = {
     .probe  = vcx_vcodec_probe,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0)
     .remove = vcx_vcodec_remove,
+#else
+    .remove = vcx_vcodec_remove,
+#endif
     .driver = {
         .name = VCX_DRIVER_NAME,
         .of_match_table = vcx_vcodec_of_match,

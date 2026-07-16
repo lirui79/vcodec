@@ -68,8 +68,6 @@ int32_t    cmda78_gen_close_session(struct proc_obj *proc, uint32_t coremask);
 
 int32_t    cmda78_gen_run_cmdbuf(struct proc_obj *proc, struct exchange_cmda78_param *cmd_param);
 
-int32_t    cmda78_gen_wait_cmdbuf_ready(struct proc_obj *proc, uint32_t coremask);
-
 int32_t    cmda78_gen_ctrl_cmdbuf(struct proc_obj *proc, uint32_t vcmdmgr_id, uint32_t cmdtype, uint32_t cmdbuf_id);
 
 int32_t    cmda78_gen_drop_owner(struct proc_obj *proc, uint64_t ownerID, uint32_t vcmdmgr_id);

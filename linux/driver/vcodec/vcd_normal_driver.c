@@ -530,7 +530,11 @@ static void _watchdog_start(watchdog_t *watchdog)
 static void _watchdog_stop(watchdog_t *watchdog)
 {
 	if (watchdog->active) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+		timer_delete(&watchdog->timer);
+#else
 		del_timer(&watchdog->timer);
+#endif
 		watchdog->active = 0;
 	}
 }
@@ -3435,7 +3439,12 @@ void  hantrodec_normal_cleanup(vcx_priv_t *priv)
 	}
 
 	/*delete timer*/
-	del_timer(&timer);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+		timer_delete(&timer);
+#else
+		del_timer(&timer);
+#endif
+
 #endif
 
 #ifdef PCIE_EN

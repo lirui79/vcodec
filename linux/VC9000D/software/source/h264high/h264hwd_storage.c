@@ -673,8 +673,8 @@ u32 h264bsdCheckAccessUnitBoundary(strmData_t * strm,
   ASSERT(strm);
   ASSERT(nu_next);
   ASSERT(storage);
-  ASSERT(storage->sps);
-  ASSERT(storage->pps);
+  //ASSERT(storage->sps);
+  //ASSERT(storage->pps);
 
   *check_strm = *strm;
   *tmp_strm_data = *strm;

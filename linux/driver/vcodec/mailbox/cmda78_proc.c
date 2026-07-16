@@ -61,6 +61,8 @@ static int32_t cmda78_work_thread_proc(void *arg) {
         cmda78_release_cmdMsg(cmdMsg);
         atomic_dec(&mgr->refcount);
     }
+
+    printk("work thread exiting\n");
     return 0;
 }
 
@@ -87,7 +89,7 @@ static int cmda78_thread_func(void *arg) {
         wake_up_interruptible(&mgr->workwaitqueue);
     }
 
-    printk("Worker thread exiting\n");
+    printk("recv thread exiting\n");
     return 0;
 }
 

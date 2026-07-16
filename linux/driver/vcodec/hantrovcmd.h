@@ -163,22 +163,29 @@ typedef u32 mmu_iova;
 
 /* Used in vcmd initialization in hantro_vcmd_xxx.c. */
 /* May be unified in next step. */
+/*
 struct vcmd_config {
-	unsigned long vcmd_base_addr;
+	u64 vcmd_base_addr;
 	u32 vcmd_iosize;
-	int vcmd_irq;
-	/*input vce=0,IM=1,vcd=2,jpege=3, jpegd=4*/
+	u32 vcmd_irq;
+	//input vce=0,IM=1,vcd=2,jpege=3, jpegd=4//
 	u32 sub_module_type;
-	u16 submodule_main_addr; // in byte
-	/* if submodule addr == 0xffff,
-	 * this submodule does not exist.// in byte
-	 */
-	u16 submodule_dec400_addr;
-	u16 submodule_MMU_addr; // in byte
-	u16 submodule_MMUWrite_addr; // in byte
-	u16 submodule_axife_addr; // in byte
+	u32 submodule_main_addr; // in byte
+	/// if submodule addr == 0xffff,
+	 // this submodule does not exist.// in byte
+	///
+	u32 submodule_dec400_addr;
+	u32 submodule_MMU_addr; // in byte
+	u32 submodule_MMUWrite_addr; // in byte
+	u32 submodule_axife_addr; // in byte
 
-	/* for Hw Register Print */
+	u32 submodule_vcd_iosize;
+	u32 submodule_dec400_iosize;
+	u32 submodule_MMU_iosize;
+	u32 submodule_MMUWrite_iosize;
+	u32 submodule_axife_iosize;
+
+	// for Hw Register Print //
 	volatile u8 *submodule_vcmd_virtual_address;
 	volatile u8 *submodule_vcd_virtual_address;
 	volatile u8 *submodule_dec400_virtual_address;
@@ -186,13 +193,8 @@ struct vcmd_config {
 	volatile u8 *submodule_MMUWrite_virtual_address;
 	volatile u8 *submodule_axife_virtual_address;
 	volatile u8 *submodule_axi2to1_virtual_address;
-	u32 submodule_vcd_iosize;
-	u32 submodule_dec400_iosize;
-	u32 submodule_MMU_iosize;
-	u32 submodule_MMUWrite_iosize;
-	u32 submodule_axife_iosize;
 
-};
+};*/
 #define ANY_CMDBUF_ID 0xFFFF
 
 /* platform frequency: need adjust it according your platform
@@ -220,58 +222,64 @@ extern u32 arbiter_timewindow;
 
 
 struct cmdbuf_mem_parameter {
-	u32 *virt_cmdbuf_addr;
 	//cmdbuf pool base physical address
-	addr_t phy_cmdbuf_addr;
+	u64 phy_cmdbuf_addr;
 	//cmdbuf pool base mmu mapping address
-	mmu_iova mmu_phy_cmdbuf_addr;
-	//cmdbuf pool total size in bytes.
-	u32 cmdbuf_total_size;
-	//one cmdbuf size in bytes. all cmdbuf have same size.
-	u16 cmdbuf_unit_size;
-	u32 *virt_status_cmdbuf_addr;
+	u64 mmu_phy_cmdbuf_addr;
+
 	//status cmdbuf pool base physical address
-	addr_t phy_status_cmdbuf_addr;
+	u64 phy_status_cmdbuf_addr;
 	//status cmdbuf pool base mmu mapping address
-	mmu_iova mmu_phy_status_cmdbuf_addr; //->addr_t
-	//status cmdbuf pool total size in bytes.
-	u32 status_cmdbuf_total_size;
-	//one status cmdbuf size in bytes. all status cmdbuf have same size.
-	u16 status_cmdbuf_unit_size;
-	// reg regbuf pool virtual adress
-	u32 *virt_vcmd_regbuf_addr;
+	u64 mmu_phy_status_cmdbuf_addr; //->addr_t
+
 	// reg regbuf pool base physical address
-	addr_t phy_vcmd_regbuf_addr;
+	u64 phy_vcmd_regbuf_addr;
 	// reg regbuf pool base mmu mapping address
-	mmu_iova mmu_phy_vcmd_regbuf_addr;
-	// reg regbuf pool total size in bytes.
-	u32 vcmd_regbuf_total_size;
-	//one reg regbuf size in bytes. all status cmdbuf have same size.
-	u32 vcmd_regbuf_unit_size;
+	u64 mmu_phy_vcmd_regbuf_addr;
+
 	/* for pcie interface, hw can only access
 	 * phy_cmdbuf_addr-pcie_base_ddr_addr.
 	 * for other interface, this value should be 0?
 	 */
-	addr_t base_ddr_addr;
+	u64 base_ddr_addr;
+
+	u32 *virt_cmdbuf_addr;
+	//cmdbuf pool total size in bytes.
+	u32 cmdbuf_total_size;
+	//one cmdbuf size in bytes. all cmdbuf have same size.
+	u32 cmdbuf_unit_size;
+
+	u32 *virt_status_cmdbuf_addr;
+	//status cmdbuf pool total size in bytes.
+	u32 status_cmdbuf_total_size;
+	//one status cmdbuf size in bytes. all status cmdbuf have same size.
+	u32 status_cmdbuf_unit_size;
+
+	// reg regbuf pool virtual adress
+	u32 *virt_vcmd_regbuf_addr;
+	// reg regbuf pool total size in bytes.
+	u32 vcmd_regbuf_total_size;
+	//one reg regbuf size in bytes. all status cmdbuf have same size.
+	u32 vcmd_regbuf_unit_size;
 };
 
 struct config_parameter {
 	/*input vce=0,cutree=1,vcd=2,jpege=3, jpegd=4 */
-	u16 module_type;
+	u32 module_type;
 	/* output, how many vcmd cores are there
 	 * with corresponding module_type.
 	 */
-	u16 vcmd_core_num;
+	u32 vcmd_core_num;
 	/*output,if submodule addr == 0xffff, this submodule does not exist.*/
-	u16 submodule_main_addr;
+	u32 submodule_main_addr;
 	/* output ,if submodule addr == 0xffff, this submodule does not exist.*/
-	u16 submodule_dec400_addr;
+	u32 submodule_dec400_addr;
 	/* output,if submodule addr == 0xffff, this submodule does not exist. */
-	u16 submodule_MMU_addr;
+	u32 submodule_MMU_addr;
 	/* output,if submodule addr == 0xffff, this submodule does not exist. */
-	u16 submodule_MMUWrite_addr;
+	u32 submodule_MMUWrite_addr;
 	/* output,if submodule addr == 0xffff, this submodule does not exist. */
-	u16 submodule_axife_addr;
+	u32 submodule_axife_addr;
 	u32 vcmd_hw_version_id;
 };
 
@@ -282,19 +290,19 @@ struct exchange_parameter {
 	//input ;executing_time=encoded_image_size*(rdoLevel+1)*(rdoq+1);
 	u64 executing_time;
 	/*input input vce=0,IM=1,vcd=2, jpege=3, jpegd=4 */
-	u16 module_type;
+	u32 module_type;
 	/*input, reserve is not used; link and run is input.*/
-	u16 cmdbuf_size;
+	u32 cmdbuf_size;
 	/* output, it is unique in driver.*/
-	u16 cmdbuf_id;
+	u32 cmdbuf_id;
 	/* just used for polling. */
-	u16 core_id;
+	u32 core_id;
 	/* core_mask for user to select cores: [0,15]core mask, [16,31]client type. */
-	u16 core_mask;
+	u32 core_mask;
 	/* input, bit[0]: priority    - normal=0, high/live=1
 	 *        bit[1]: has_end_cmd - last cmd is JMP (0) or END (1) command
 	 */
-	u16 input_mask;
+	u32 input_mask;
 };
 
 

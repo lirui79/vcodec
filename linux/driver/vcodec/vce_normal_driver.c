@@ -685,7 +685,12 @@ static void _watchdog_start(hantroenc_t *dev)
 static void _watchdog_stop(hantroenc_t *dev)
 {
 	if (dev->watchdog_active) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+		timer_delete(&dev->watchdog_timer);
+#else
 		del_timer(&dev->watchdog_timer);
+#endif
+
 		dev->watchdog_active = 0;
 	}
 }

@@ -6645,7 +6645,7 @@ void VCEncSetSliceInfoCfg(asicData_s *asic) {
     Return type   : EWLHwConfig_t
     Argument      : codecFormat - codec format
 ------------------------------------------------------------------------------*/
-const EWLHwConfig_t *EncGetAsicConfig(VCEncVideoCodecFormat codecFormat, const void *ctx) {
+const EWLHwConfig_t *EncGetAsicConfig(u32 codecFormat, const void *ctx) {
   CLIENT_TYPE clientType = EncAsicGetClientType(codecFormat);
   return EncAsicGetAsicConfig((u32)clientType, ctx);
 }

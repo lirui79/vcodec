@@ -57,7 +57,7 @@
 
 vcodec_dev ?= vcodec
 
-PCIE_EN ?= y
+PCIE_EN ?= n
 EMU ?= n
 ARM_CROSS_COMPILE ?= n
 SUPPORT_VCMD_ENABLE_IP ?= n
@@ -87,7 +87,7 @@ SUPPORT_DTB_IM ?= n
 SUPPORT_WATCHDOG ?= y
 
 # set it to 'y' to enable debugfs
-SUPPORT_DEBUGFS ?= y
+SUPPORT_DEBUGFS ?= n
 # set it to 'y' to enable power management
 SUPPORT_PM ?= n
 # if need request vcarb manually, set it to 'y'
@@ -175,14 +175,14 @@ ifeq ($(SUPPORT_WATCHDOG),y)
 endif
 
 ifeq ($(SUPPORT_PM),y)
-  EXTRA_CFLAGS += -DCONFIG_ENC_PM
+  EXTRA_CFLAGS += -DCONFIG_ENC_PM -DCONFIG_DEC_PM
 endif
- EXTRA_CFLAGS += -DCONFIG_ENC_PM -DCONFIG_DEC_PM
 
 ifeq ($(obj),)
 obj = .
 endif
 
+ccflags-y += $(EXTRA_CFLAGS)
 #################################################
 # configuration
 

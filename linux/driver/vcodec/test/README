@@ -1,0 +1,4 @@
+
+Usage: ./test_vcodec [--file=/dev/hantrovcx - /dev/hantroenc - /dev/hantrodec] [-h] [-v]
+
+ ./test_vcodec  --file=/dev/hantrodec

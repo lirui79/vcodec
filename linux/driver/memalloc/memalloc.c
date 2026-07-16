@@ -68,6 +68,12 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+
+#include <linux/cdev.h>
+#include <linux/types.h>
+#include <linux/of_device.h>
+#include <linux/platform_device.h>
+
 #ifdef DTB_SUPPORT
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -151,7 +157,7 @@ static unsigned long addr_transl = HLINA_TRANSL_OFFSET;
 /* Reserve mem for VCMD buffer */
 static unsigned int vcmd_size = HLINA_TRANSL_VCMD_SIZE;
 static unsigned long ddr_offset;
-static char *mem_dev_n;
+static char *mem_dev_n = "memalloc";
 static int memalloc_major; /* dynamic */
 static unsigned int ddr_size = 768;
 static unsigned long mem_alloc_table_size = 0x800000; /* Reserve 8MB for memeory allocator table by default. */
@@ -175,6 +181,20 @@ typedef struct hlinc {
 
 static hlina_chunk *hlina_chunks;
 static size_t chunks;
+
+/*********************************************/
+#define         MEM_DRIVER_NAME     "memalloc"
+static const   char *CLASS_NAME   = "memallocclass";
+static const   int  DEVICE_COUNT  =  1;  // 注册3个设备
+
+static struct   class *mem_class  = NULL;
+static dev_t    base_dev_no       = 0;   // 起始设备号
+//static int      major_num         = 0;
+static struct cdev    cdev;////// 字符设备核心结构
+static dev_t  devno               = 0;///// 完整的设备号 (Major + Minor)
+static struct device       *dev   = NULL;
+/*********************************************/
+
 
 static int AllocMemory(unsigned long *busaddr, unsigned long size,
 		       const struct file *filp);
@@ -209,9 +229,9 @@ static long memalloc_ioctl(struct file *filp, unsigned int cmd,
 						 _IOC_SIZE(cmd));
 #else
 	if (_IOC_DIR(cmd) & _IOC_READ)
-		ret = !access_ok(arg, _IOC_SIZE(cmd));
+		ret = !access_ok((void *)arg, _IOC_SIZE(cmd));
 	else if (_IOC_DIR(cmd) & _IOC_WRITE)
-		ret = !access_ok(arg, _IOC_SIZE(cmd));
+		ret = !access_ok((void *)arg, _IOC_SIZE(cmd));
 #endif
 	if (ret)
 		return -EFAULT;
@@ -286,8 +306,15 @@ static void __exit memalloc_cleanup(void)
 	if (hlina_chunks)
 		vfree(hlina_chunks);
 
-	unregister_chrdev(memalloc_major, mem_dev_n);
-	PDEBUG("module removed\n");
+	// 1. 销毁设备节点
+	device_destroy(mem_class, devno);
+	// 2. 删除 cdev
+	cdev_del(&cdev);
+    // 3. 释放设备号
+    unregister_chrdev_region(base_dev_no, DEVICE_COUNT);
+    // 4. 销毁类
+    class_destroy(mem_class);
+    pr_info("module removed");
 }
 
 /* VFS methods */
@@ -386,7 +413,7 @@ out:
 
 static int __init memalloc_init(void)
 {
-	int result;
+	int result, ret;
 
 #ifdef DTB_SUPPORT
 	result = get_of_mem();
@@ -394,7 +421,7 @@ static int __init memalloc_init(void)
 		goto err;
 #endif
 
-	PDEBUG("module init\n");
+	pr_info("module init\n");
 #ifdef PCIE_EN
 	result = PcieInit();
 	if (result)
@@ -415,17 +442,54 @@ static int __init memalloc_init(void)
 		goto err;
 	}
 
-	result = register_chrdev(memalloc_major, mem_dev_n, &memalloc_fops);
-	if (result < 0) {
-		PDEBUG("memalloc: unable to get major %d\n", memalloc_major);
+    // 1. 创建类
+    mem_class = class_create(CLASS_NAME);
+    if (IS_ERR(mem_class)) {
+        pr_info("Failed to create class\n");
+		result = -ENOMEM;
 		goto err;
-	} else if (result != 0) {/* this is for dynamic major */
-		memalloc_major = result;
-	}
+    }
+
+    // 2. 动态分配一组设备号 (主设备号自动分配，次设备号预留 0~2)
+    ret = alloc_chrdev_region(&base_dev_no, 0, DEVICE_COUNT, MEM_DRIVER_NAME);
+    if (ret < 0) {
+        pr_err("Failed to allocate chrdev region\n");
+		result = -ENOMEM;
+        goto err_class;
+    }
+    memalloc_major = MAJOR(base_dev_no);
+    pr_info("Allocated Major Number: %d\n", memalloc_major);
+
+	// 2. 计算设备号: 主设备号相同，次设备号 = id
+    devno = MKDEV(memalloc_major, 0);
+
+    // 3. 初始化并添加 cdev
+    cdev_init(&cdev, &memalloc_fops);
+    cdev.owner = THIS_MODULE;
+    ret = cdev_add(&cdev, devno, 1);
+    if (ret) {
+        pr_err("Failed to add cdev\n");
+		result = -ENOMEM;
+        goto err_chrdev;
+    }
+
+    // 4. 创建设备节点 /dev/ 下
+    // 这会在 /sys/class/hantroclass/ 下创建条目，并触发 udev 创建 /dev 节点
+    dev = device_create(mem_class, NULL, devno, NULL, "%s", MEM_DRIVER_NAME);
+    if (IS_ERR(dev)) {
+        cdev_del(&cdev);
+        pr_err("Failed to create device node for name %s\n", MEM_DRIVER_NAME);
+		result = -ENOMEM;
+        goto err_chrdev;
+    }
 
 	ResetMems();
 
 	return 0;
+err_chrdev:
+    unregister_chrdev_region(base_dev_no, DEVICE_COUNT);
+err_class:
+    class_destroy(mem_class);
 
 err:
 	if (hlina_chunks)
