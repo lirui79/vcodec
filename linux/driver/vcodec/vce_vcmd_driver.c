@@ -1286,8 +1286,9 @@ static void dev_ctx_init(vcmd_mgr_t *vcmd_mgr)
         {
            u32 *main_regs_va = NULL;
            main_regs_va = dev->reg_mem_va + dev->subsys_info->reg_off[SUB_MOD_MAIN] / 4 + 0;
-           *main_regs_va = (u32)0x9000FFFF;
+           *main_regs_va = (u32)0x90004200;
            *(main_regs_va + 80)= (u32)0xFFFFFFFF;
+           *(main_regs_va + 509)= (u32)0x7000217e;
         }
 #endif
 	}
