@@ -28,6 +28,8 @@ int main_encode(int argc, char **argv, const char *optarg);
 
 int main_decode(int argc, char **argv, const char *optarg);
 
+int test_vcmd_mmu(int fd);
+
 #ifdef __cplusplus
 }
 #endif

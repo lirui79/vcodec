@@ -39,7 +39,7 @@
 
 
 
-//  HANTRO_IOCS_MMU_MEM_MAP  HANTRO_IOCS_MMU_MEM_UNMAP  HANTRO_IOCS_MMU_FLUSH HANTRO_IOCS_MMU_SWITCH_PAGETABLE HANTRO_IOCS_MMU_SWITCH_PAGETABLE_BY_CMDBUF
+
 
 
 static int  test_get_config(int fd);
@@ -69,6 +69,10 @@ int main_encode(int argc, char **argv, const char *optarg) {
   }
 
   if (test_vcmd_cmdbuf(fd) < 0) {
+    goto end;
+  }
+
+  if (test_vcmd_mmu(fd) < 0) {
     goto end;
   }
 

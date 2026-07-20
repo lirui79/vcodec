@@ -1865,7 +1865,6 @@ static long hantrovcmd_ioctl(struct file *filp, unsigned int cmd,
 
 	case HANTRO_IOCH_WRITE_CORE_REGS: {
 		struct core_regs_wr core;
-		int i = 0;
 
 		tmp = copy_from_user(&core, (struct core_regs_wr __user *)arg,
 					 sizeof(struct core_regs_wr));
@@ -1878,13 +1877,16 @@ static long hantrovcmd_ioctl(struct file *filp, unsigned int cmd,
 #endif
 
 		vcmd_klog(LOGLVL_CONFIG, "%s %s %d Core Regs %ld %ld:%x %x %x %x \nregs:\n", __FILE__, __func__, __LINE__, sizeof(struct core_regs_wr), tmp, core.type, core.id, core.reg_id, core.reg_num);
-        for (i = 0; i < core.reg_num; i++) {
-            if (i == 8) {
-		       vcmd_klog(LOGLVL_CONFIG, "\n");
-            }
-		    vcmd_klog(LOGLVL_CONFIG, " %x", core.reg_val[i]);
-        }
-		vcmd_klog(LOGLVL_CONFIG, "\n");
+		if (LOGLVL_CONFIG >= vsi_kloglvl) {
+		    int i = 0;
+			for (i = 0; i < core.reg_num; i++) {
+				if (i == 8) {
+				printk("\n");
+				}
+				printk(" %x", core.reg_val[i]);
+			}
+			printk("\n");
+		}
 		break;
 	}
 

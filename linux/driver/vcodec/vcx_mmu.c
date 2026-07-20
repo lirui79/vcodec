@@ -81,6 +81,9 @@
 #include <linux/stddef.h>
 
 #include "vcx_mmu_priv.h"
+#include "vcx_vcmd_priv.h"
+
+#define MMU_VA_BITS 40
 
 
 
@@ -3662,14 +3665,19 @@ static long MMUCtlBufferMap(struct file *filp, unsigned long arg)
 		MMUDEBUG("copy_from_user failed, returned %li\n", tmp);
 		return -MMU_EFAULT;
 	}
-
+#ifdef VCMD_ALLOC_MEM
 	MMUMemNodeMap(&addr, filp);
+#else
+    addr.bus_address = 0x800000;
+#endif
 
 	tmp = copy_to_user((void __user *)arg, &addr, sizeof(struct addr_desc));
 	if (tmp) {
 		MMUDEBUG("copy_to_user failed, returned %li\n", tmp);
 		return -MMU_EFAULT;
 	}
+
+	vcmd_klog(LOGLVL_CONFIG, "%s %s %d MMU Map %d: %x %x %x\n", __FILE__, __func__, __LINE__, tmp, addr.virtual_address, addr.bus_address, addr.size);
 	return 0;
 }
 
@@ -3684,7 +3692,10 @@ static long MMUCtlBufferUnmap(unsigned long arg)
 		return -MMU_EFAULT;
 	}
 
+	vcmd_klog(LOGLVL_CONFIG, "%s %s %d MMU Unmap %d: %x %x %x\n", __FILE__, __func__, __LINE__, tmp, addr.virtual_address, addr.bus_address, addr.size);
+#ifdef VCMD_ALLOC_MEM
 	MMUMemNodeUnmap(&addr);
+#endif
 	return 0;
 }
 
@@ -3700,8 +3711,10 @@ static long MMUCtlFlush(unsigned long arg,
 		return -MMU_EFAULT;
 	}
 
+	vcmd_klog(LOGLVL_CONFIG, "%s %s %d MMU Flush %d:%x\n", __FILE__, __func__, __LINE__, tmp, core_id);
+#ifdef VCMD_ALLOC_MEM
 	MMUFlush(core_id, hwregs);
-
+#endif
 	return 0;
 }
 
@@ -3719,7 +3732,10 @@ static long MMUCtlSwitchPageTable(struct file *filp, unsigned long arg,
 		return -MMU_EFAULT;
 	}
 
+	vcmd_klog(LOGLVL_CONFIG, "%s %s %d MMU SWITCH Flush %d:%x\n", __FILE__, __func__, __LINE__, tmp, core_id);
+#ifdef VCMD_ALLOC_MEM
 	MMUSwitchPageTable(filp, core_id, hwregs);
+#endif
 #endif
 
 	return tmp;
@@ -3730,17 +3746,32 @@ static long MMUCtlSwitchPageTableByCmdBuf(struct file *filp, unsigned long arg)
 	long tmp = 1;
 #ifdef MMU_PAGE_TABLE_SWITCH
 	struct page_table_switch params;
-
+#ifdef VCMD_ALLOC_MEM
 	MMUSwitchPageTableByCmdBuf(filp, &params);
-
+#else
+    params.id = 0x16;
+    params.pt_flush.flush_cnt = 2;
+	params.pt_flush.flush_vmid[0] = 0x12;
+	params.pt_flush.flush_vmid[1] = 0x88;
+#endif
 	tmp = copy_to_user((void __user *)arg, &params,
 		sizeof(struct page_table_switch));
 	if (tmp) {
 		MMUDEBUG("copy_to_user failed, returned %li\n", tmp);
 		return -MMU_EFAULT;
 	}
+	vcmd_klog(LOGLVL_CONFIG, "%s %s %d MMU SWITCH %d: %x %x vmid:\n", __FILE__, __func__, __LINE__, tmp, params.id, params.pt_flush.flush_cnt);
+	if (LOGLVL_CONFIG >= vsi_kloglvl) {
+		int i = 0;
+		for (i = 0; i < params.pt_flush.flush_cnt; i++) {
+			if (i == 8) {
+				printk("\n");
+			}
+			printk(" %x", params.pt_flush.flush_vmid[i]);
+		}
+		printk("\n");
+	}
 #endif
-
 	return tmp;
 }
 

@@ -88,6 +88,10 @@ int main_decode(int argc, char **argv, const char *optarg) {
     goto end;
   }
 
+  if (test_vcmd_mmu(fd) < 0) {
+    goto end;
+  }
+
   close(fd);
   return 0;
 

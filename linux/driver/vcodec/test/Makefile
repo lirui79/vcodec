@@ -63,7 +63,7 @@ INCFLAGS = -I./ -I../ -I../../../VC9000D/software/source/inc/  -I../../../VC9000
 DEBFLAGS = -O0 -g
 CFLAGS = $(INCFLAGS) $(DEBFLAGS)
 
-SRCS = testbench_vcodec.c testbench_vcodex.c testbench_encode.c testbench_decode.c
+SRCS = testbench_vcodec.c testbench_vcodex.c testbench_encode.c testbench_decode.c testbench_mmu.c
 
 TARGET = test_vcodec
 
